@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space Combat - Sistema de Movimento</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: Arial, sans-serif;
+            color: #fff;
+        }
+        
+        #game-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        
+        #minimap {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            border: 2px solid #fff;
+            z-index: 2;
+        }
+        
+        .touch-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            width: 200px;
+            z-index: 3;
+        }
+        
+        .touch-btn {
+            width: 60px;
+            height: 60px;
+            margin: 5px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border: 2px solid #fff;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            font-weight: bold;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        .touch-fire {
+            background-color: rgba(255, 0, 0, 0.3);
+        }
+        
+        .arrow-up, .arrow-down, .arrow-left, .arrow-right {
+            width: 0;
+            height: 0;
+            border-style: solid;
+        }
+        
+        .arrow-up {
+            border-width: 0 10px 15px 10px;
+            border-color: transparent transparent #fff transparent;
+        }
+        
+        .arrow-down {
+            border-width: 15px 10px 0 10px;
+            border-color: #fff transparent transparent transparent;
+        }
+        
+        .arrow-left {
+            border-width: 10px 15px 10px 0;
+            border-color: transparent #fff transparent transparent;
+        }
+        
+        .arrow-right {
+            border-width: 10px 0 10px 15px;
+            border-color: transparent transparent transparent #fff;
+        }
+        
+        #loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+        
+        #loading-bar {
+            width: 300px;
+            height: 20px;
+            background-color: #333;
+            margin-top: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        #progress-bar {
+            height: 100%;
+            width: 0%;
+            background-color: #2196F3;
+            transition: width 0.3s;
+        }
+        
+        #game-title {
+            font-size: 36px;
+            margin-bottom: 20px;
+            color: #2196F3;
+            text-shadow: 0 0 10px rgba(33, 150, 243, 0.7);
+        }
+        
+        #game-info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 2;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading-screen">
+        <h1 id="game-title">SPACE COMBAT</h1>
+        <p>Carregando sistema de navegação...</p>
+        <div id="loading-bar">
+            <div id="progress-bar"></div>
+        </div>
+    </div>
+    
+    <div id="game-info">
+        <div>Velocidade: <span id="speed-info">0</span></div>
+        <div>Posição: <span id="position-info">0,0</span></div>
+        <div>Inimigos: <span id="enemies-info">0</span></div>
+    </div>
+    
+    <canvas id="game-canvas"></canvas>
+    <canvas id="minimap"></canvas>
+    
+    <script src="game_assets.js"></script>
+    <script src="space_arm_movement.js"></script>
+    <script>
+        // Criar assets antes de inicializar o jogo
+        function createAssetPlaceholders() {
+            // Criar imagens de placeholder para evitar erros de carregamento
+            const spaceshipImg = new Image();
+            spaceshipImg.src = 'data:image/png;base64,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';
+            
+            const backgroundImg = new Image();
+            backgroundImg.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+            
+            return {
+                spaceship: spaceshipImg,
+                background: backgroundImg
+            };
+        }
+        
+        // Criar assets antes de inicializar o jogo
+        const gameAssets = createAssetPlaceholders();
+        
+        // Inicializar tela de carregamento
+        const loadingScreen = document.getElementById('loading-screen');
+        const progressBar = document.getElementById('progress-bar');
+        let progress = 0;
+        
+        const loadingInterval = setInterval(() => {
+            progress += 5;
+            progressBar.style.width = `${progress}%`;
+            
+            if (progress >= 100) {
+                clearInterval(loadingInterval);
+                setTimeout(() => {
+                    loadingScreen.style.display = 'none';
+                    initGame();
+                }, 500);
+            }
+        }, 100);
+        
+        // Inicializar jogo
+        function initGame() {
+            const gameCanvas = document.getElementById('game-canvas');
+            const minimap = document.getElementById('minimap');
+            const speedInfo = document.getElementById('speed-info');
+            const positionInfo = document.getElementById('position-info');
+            const enemiesInfo = document.getElementById('enemies-info');
+            
+            // Modificar o SpaceshipController para usar os assets criados
+            const originalSpaceshipImage = SpaceshipController.prototype.spaceshipImage;
+            const originalBackgroundImage = SpaceshipController.prototype.backgroundImage;
+            
+            // Sobrescrever as propriedades de imagem com nossos placeholders
+            SpaceshipController.prototype.spaceshipImage = gameAssets.spaceship;
+            SpaceshipController.prototype.backgroundImage = gameAssets.background;
+            
+            // Criar controlador da nave
+            const controller = new SpaceshipController(gameCanvas, minimap);
+            
+            // Atualizar informações na interface
+            setInterval(() => {
+                const speed = Math.sqrt(
+                    controller.spaceship.velocity.x ** 2 + 
+                    controller.spaceship.velocity.y ** 2
+                ).toFixed(2);
+                
+                speedInfo.textContent = speed;
+                positionInfo.textContent = `${Math.round(controller.spaceship.x)},${Math.round(controller.spaceship.y)}`;
+                enemiesInfo.textContent = controller.enemies.length;
+            }, 100);
+            
+            // Adicionar controles de toque para dispositivos móveis
+            if ('ontouchstart' in window) {
+                document.querySelector('.touch-controls').style.display = 'flex';
+            }
+        }
+    </script>
+</body>
+</html>

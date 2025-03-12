@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Space Arm 3D</title>
+    <style>
+        body {
+            font-family: 'Orbitron', sans-serif;
+            background-color: #0a0a1a;
+            color: #e0e0ff;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            margin: 0;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" fill="%230a0a1a"/><g fill="%23ffffff" opacity="0.3"><circle cx="25" cy="25" r="1"/><circle cx="75" cy="50" r="0.8"/><circle cx="125" cy="100" r="1.2"/><circle cx="175" cy="150" r="0.6"/><circle cx="225" cy="200" r="1"/><circle cx="275" cy="250" r="0.7"/><circle cx="325" cy="300" r="1.1"/><circle cx="375" cy="350" r="0.9"/><circle cx="50" cy="375" r="0.8"/><circle cx="100" cy="325" r="1"/><circle cx="150" cy="275" r="0.7"/><circle cx="200" cy="225" r="1.2"/><circle cx="250" cy="175" r="0.6"/><circle cx="300" cy="125" r="1"/><circle cx="350" cy="75" r="0.9"/></g></svg>');
+            background-repeat: repeat;
+            animation: space-move 60s linear infinite;
+        }
+
+        @keyframes space-move {
+            from { background-position: 0 0; }
+            to { background-position: 1000px 1000px; }
+        }
+
+        .menu-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 30, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            z-index: 11;
+        }
+
+        .menu-screen button {
+            padding: 15px 30px;
+            font-size: 1.2em;
+            background-color: #1a1a4a;
+            color: #e0e0ff;
+            border: 2px solid #4080ff;
+            border-radius: 10px;
+            cursor: pointer;
+            font-family: 'Orbitron', sans-serif;
+            transition: all 0.3s ease;
+        }
+
+        .menu-screen button:hover {
+            background-color: #4080ff;
+            box-shadow: 0 0 15px #4080ff;
+        }
+
+        .menu-screen button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        #game-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #game-info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background-color: rgba(0, 0, 30, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #4080ff;
+            pointer-events: auto;
+        }
+
+        #theme-info {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background-color: rgba(0, 0, 30, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #4080ff;
+            pointer-events: auto;
+        }
+
+        #performance-info {
+            position: absolute;
+            top: 150px;
+            left: 20px;
+            background-color: rgba(0, 0, 30, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #4080ff;
+            pointer-events: auto;
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            background-color: rgba(0, 0, 30, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #4080ff;
+            pointer-events: auto;
+        }
+
+        .control-key {
+            display: inline-block;
+            background-color: #1a1a4a;
+            color: #e0e0ff;
+            padding: 10px 15px;
+            border-radius: 5px;
+            border: 1px solid #4080ff;
+            min-width: 40px;
+            text-align: center;
+            margin-right: 5px;
+        }
+
+        #message-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 30, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #4080ff;
+            font-size: 1.5em;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            pointer-events: none;
+        }
+
+        #loading-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #0a0a1a;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 12;
+        }
+
+        #loading-progress {
+            width: 300px;
+            height: 20px;
+            background-color: #1a1a4a;
+            border-radius: 10px;
+            margin-top: 20px;
+            overflow: hidden;
+        }
+
+        #progress-bar {
+            height: 100%;
+            width: 0%;
+            background-color: #4080ff;
+            transition: width 0.3s ease;
+        }
+
+        .enemy {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background-color: red;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 15px red;
+            transition: box-shadow 0.3s ease, transform 0.3s ease;
+        }
+
+        .projectile {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #ff6000;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 10px #ff9000;
+        }
+
+        .explosion {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            background-color: orange;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 20px yellow;
+            opacity: 1;
+            transition: all 0.3s ease-out;
+        }
+        
+        #arm {
+            position: absolute;
+            width: 120px;
+            height: 120px;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><defs><linearGradient id="bodyGradient" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%23303f9f" /><stop offset="100%" stop-color="%231a237e" /></linearGradient><linearGradient id="cockpitGradient" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%2381d4fa" /><stop offset="100%" stop-color="%2329b6f6" /></linearGradient><filter id="glow"><feGaussianBlur stdDeviation="1.5" result="blur" /><feComposite in="SourceGraphic" in2="blur" operator="over" /></filter><filter id="engineGlow"><feGaussianBlur stdDeviation="2" result="blur" /><feComposite in="SourceGraphic" in2="blur" operator="over" /></filter></defs><!-- Main Body --><path d="M60,20 L75,40 L90,45 L75,50 L60,80 L45,50 L30,45 L45,40 Z" fill="url(%23bodyGradient)" stroke="%23e0e0ff" stroke-width="1.5"/><!-- Wings --><path d="M60,40 L90,50 L95,60 L60,55 Z" fill="%232c387e" stroke="%23e0e0ff" stroke-width="1"/><!-- Left Wing --><path d="M60,40 L30,50 L25,60 L60,55 Z" fill="%232c387e" stroke="%23e0e0ff" stroke-width="1"/><!-- Tail Fins --><path d="M60,65 L70,75 L65,85 L60,80 Z" fill="%232c387e" stroke="%23e0e0ff" stroke-width="0.8"/><!-- Left Tail Fin --><path d="M60,65 L50,75 L55,85 L60,80 Z" fill="%232c387e" stroke="%23e0e0ff" stroke-width="0.8"/><!-- Cockpit --><path d="M60,30 L65,40 L60,50 L55,40 Z" fill="url(%23cockpitGradient)" stroke="%23e0e0ff" stroke-width="0.8"/><!-- Weapon Mounts Right --><path d="M75,45 L85,47 L85,49 L75,47 Z" fill="%23424242" stroke="%23e0e0ff" stroke-width="0.5"/><!-- Weapon Mounts Left --><path d="M45,45 L35,47 L35,49 L45,47 Z" fill="%23424242" stroke="%23e0e0ff" stroke-width="0.5"/><!-- Afterburner Effects --><circle cx="60" cy="85" r="4" fill="%23ff6000" filter="url(%23engineGlow)" /><!-- Side Afterburner Effects --><circle cx="56" cy="83" r="2.5" fill="%23ff9000" filter="url(%23engineGlow)" /><circle cx="64" cy="83" r="2.5" fill="%23ff9000" filter="url(%23engineGlow)" /><!-- Weapon Details --><circle cx="85" cy="48" r="1.5" fill="%23ff0000" filter="url(%23glow)" /><circle cx="35" cy="48" r="1.5" fill="%23ff0000" filter="url(%23glow)" /><!-- Panel Lines --><path d="M60,25 L60,75" stroke="%23e0e0ff" stroke-width="0.3" opacity="0.7"/><path d="M50,45 L70,45" stroke="%23e0e0ff" stroke-width="0.3" opacity="0.7"/><path d="M55,35 L65,35" stroke="%23e0e0ff" stroke-width="0.3" opacity="0.7"/></svg>');
+            background-size: contain;
+            background-repeat: no-repeat;
+            transform: translate(-50%, -50%) rotate(0deg);
+            z-index: 3;
+            animation: fighter-pulse 2s infinite;
+            transition: transform 0.2s ease;
+        }
+
+        .celestial-object {
+            position: absolute;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .planet {
+            box-shadow: 0 0 20px rgba(100, 200, 255, 0.5);
+        }
+
+        .asteroid {
+            background-color: #555;
+            box-shadow: 0 0 5px rgba(100, 100, 100, 0.5);
+        }
+
+        .nebula {
+            border-radius: 0;
+            background: radial-gradient(ellipse at center, rgba(100, 50, 255, 0.3) 0%, rgba(100, 50, 255, 0) 70%);
+            filter: blur(10px);
+        }
+
+        .targeting-reticle {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            border: 2px solid #ff0000;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 5;
+            opacity: 0.7;
+        }
+
+        .targeting-reticle::before,
+        .targeting-reticle::after {
+            content: '';
+            position: absolute;
+            background-color: #ff0000;
+        }
+
+        .targeting-reticle::before {
+            width: 2px;
+            height: 20px;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .targeting-reticle::after {
+            width: 20px;
+            height: 2px;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        #hud-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 4;
+        }
+
+        .hud-element {
+            position: absolute;
+            background-color: rgba(0, 0, 30, 0.5);
+            border: 1px solid #4080ff;
+            border-radius: 5px;
+            padding: 10px;
+            color: #e0e0ff;
+            font-size: 0.9em;
+            pointer-events: none;
+        }
+
+        #radar {
+            bottom: 20px;
+            right: 20px;
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background-color: rgba(0, 30, 60, 0.5);
+            border: 2px solid #4080ff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #radar::before {
+            content: '';
+            position: absolute;
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            border: 1px solid rgba(64, 128, 255, 0.5);
+        }
+
+        #radar::after {
+            content: '';
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            border: 1px solid rgba(64, 128, 255, 0.3);
+        }
+
+        .radar-blip {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: #ff3030;
+            transform: translate(-50%, -50%);
+        }
+
+        .radar-player {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #40ff40;
+            transform: translate(-50%, -50%);
+            top: 50%;
+            left: 50%;
+        }
+
+        #weapon-indicator {
+            bottom: 20px;
+            left: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .weapon-slot {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .weapon-icon {
+            width: 30px;
+            height: 30px;
+            background-color: #1a1a4a;
+            border: 1px solid #4080ff;
+            border-radius: 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .weapon-ammo {
+            height: 10px;
+            width: 100px;
+            background-color: rgba(30, 30, 60, 0.5);
+            border: 1px solid #4080ff;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .weapon-ammo-fill {
+            height: 100%;
+            background-color: #ff6000;
+            width: 100%;
+        }
+
+        #velocity-indicator {
+            position: absolute;
+            left: 50%;
+            bottom: 100px;
+            transform: translateX(-50%);
+            width: 200px;
+            height: 20px;
+            background-color: rgba(0, 30, 60, 0.5);
+            border: 1px solid #4080ff;
+            border-radius: 10px;
+        }
+
+        #velocity-fill {
+            height: 100%;
+            background: linear-gradient(to right, #4080ff, #40ffff);
+            width: 0%;
+            border-radius: 10px;
+            transition: width 0.3s ease;
+        }
+
+        #aim-assist-indicator {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 5px 15px;
+            background-color: rgba(0, 30, 60, 0.5);
+            border: 1px solid #4080ff;
+            border-radius: 15px;
+            font-size: 0.8em;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 15px #4080ff; }
+            50% { box-shadow: 0 0 25px #4080ff; }
+            100% { box-shadow: 0 0 15px #4080ff; }
+        }
+        
+        @keyframes fighter-pulse {
+            0% { box-shadow: 0 0 15px #4080ff; }
+            50% { box-shadow: 0 0 25px #ff6000, 0 0 35px #4080ff; }
+            100% { box-shadow: 0 0 15px #4080ff; }
+        }
+        
+        @keyframes explosion-pulse {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(2); opacity: 0; }
+        }
+        
+        @keyframes rotate {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+
+        @keyframes radar-scan {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+        
+        @media (max-width: 768px) {
+            #game-info, #theme-info, #performance-info {
+                padding: 10px;
+                font-size: 0.8em;
+            }
+            
+            #controls {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            
+            .control-key {
+                padding: 8px 12px;
+                min-width: 30px;
+            }
+
+            #radar {
+                width: 100px;
+                height: 100px;
+            }
+
+            #radar::before {
+                width: 90px;
+                height: 90px;
+            }
+
+            #radar::after {
+                width: 60px;
+                height: 60px;
+            }
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="main-menu" class="menu-screen">
+        <h1>SPACE ARM 3D</h1>
+        <button id="new-game-btn">Novo Jogo</button>
+        <button id="continue-game-btn">Continuar</button>
+        <button id="settings-btn">Configurações</button>
+        <button id="delete-save-btn">Deletar Save</button>
+    </div>
+    
+    <div id="settings-menu" class="menu-screen" style="display: none;">
+        <h1>Configurações</h1>
+        <div style="display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px;">
+            <div>
+                <label for="aim-assist-level">Assistência de Mira:</label>
+                <select id="aim-assist-level" style="margin-left: 10px; padding: 5px; background: #1a1a4a; color: #e0e0ff; border: 1px solid #4080ff;">
+                    <option value="0">Desativada</option>
+                    <option value="1">Básico</option>
+                    <option value="2" selected>Padrão</option>
+                    <option value="3">Avançado</option>
+                </select>
+            </div>
+            <div>
+                <label for="graphics-quality">Qualidade Gráfica:</label>
+                <select id="graphics-quality" style="margin-left: 10px; padding: 5px; background: #1a1a4a; color: #e0e0ff; border: 1px solid #4080ff;">
+                    <option value="low">Baixa</option>
+                    <option value="medium" selected>Média</option>
+                    <option value="high">Alta</option>
+                </select>
+            </div>
+            <div>
+                <label for="sound-volume">Volume:</label>
+                <input type="range" id="sound-volume" min="0" max="100" value="50" style="margin-left: 10px;">
+            </div>
+        </div>
+        <button id="settings-back-btn">Voltar</button>
+    </div>
+    
+    <div id="game-container">
+        <canvas id="game-canvas"></canvas>
+        
+        <div id="ui-overlay">
+            <div id="game-info">
+                <div id="score">Score: 0</div>
+                <div id="level">Level: 1</div>
+                <div id="weapon-level">Arma: Nível 1</div>
+            </div>
+            
+            <div id="theme-info">
+                <div id="current-theme">Tema: Guerra Espacial</div>
+            </div>
+            
+            <div id="performance-info">
+                <div id="fps">FPS: 60</div>
+                <div id="accuracy">Precisão: 0%</div>
+                <div id="response-time">Tempo de Resposta: 0ms</div>
+            </div>
+            
+            <div id="controls">
+                <div><span class="control-key">W</span> <span class="control-desc">Frente</span></div>
+                <div><span class="control-key">S</span> <span class="control-desc">Trás</span></div>
+                <div><span class="control-key">A</span> <span class="control-desc">Esquerda</span></div>
+                <div><span class="control-key">D</span> <span class="control-desc">Direita</span></div>
+                <div><span class="control-key">Q</span> <span class="control-desc">Subir</span></div>
+                <div><span class="control-key">E</span> <span class="control-desc">Descer</span></div>
+                <div><span class="control-key">SHIFT</span> <span class="control-desc">Impulso</span></div>
+                <div><span class="control-key">SPACE</span> <span class="control-desc">Atirar</span></div>
+                <div><span class="control-key">TAB</span> <span class="control-desc">Mudar Arma</span></div>
+            </div>
+            
+            <div id="message-box"></div>
+            
+            <div id="arm"></div>
+        </div>
+
+        <div id="hud-overlay">
+            <div id="radar" class="hud-element">
+                <div class="radar-player"></div>
+                <!-- Radar blips will be added dynamically -->
+            </div>
+
+            <div id="weapon-indicator" class="hud-element">
+                <div class="weapon-slot">
+                    <div class="weapon-icon">L</div>
+                    <div class="weapon-ammo"><div class="weapon-ammo-fill"></div></div>
+                </div>
+                <div class="weapon-slot">
+                    <div class="weapon-icon">M</div>
+                    <div class="weapon-ammo"><div class="weapon-ammo-fill" style="width: 70%"></div></div>
+                </div>
+            </div>
+
+            <div id="velocity-indicator">
+                <div id="velocity-fill"></div>
+            </div>
+
+            <div id="aim-assist-indicator">Auto-Aim: Ativo</div>
+
+            <!-- Targeting reticle will be added dynamically when targeting enemies -->
+        </div>
+        
+        <div id="loading-screen">
+            <h1>SPACE ARM 3D</h1>
+            <p>Carregando recursos do jogo...</p>
+            <div id="loading-progress">
+                <div id="progress-bar"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Configurações do jogo
+        const gameConfig = {
+            level: 1,
+            weaponLevel: 1,
+            maxWeaponLevel: 5,
+            score: 0,
+            isGameRunning: true,
+            levelThemes: {
+                1: "Guerra Espacial",
+                2: "Batalha Intergaláctica",
+                3: "Conflito Estelar",
+                4: "Combate Orbital"
+            },
+            enemySpeed: 1.5,
+            enemySpawnRate: 2000, // ms
+            projectileSpeed: 8,
+            armSpeed: 5,
+            // Novas configurações para 3D
+            physics: {
+                inertia: 0.98, // Fator de inércia (quanto maior, mais desliza)
+                acceleration: 0.2, // Aceleração da nave
+                maxVelocity: 10, // Velocidade máxima
+                rotationSpeed: 0.05, // Velocidade de rotação
+                thrustPower: 1.5 // Potência do impulso (SHIFT)
+            },
+            autoAim: {
+                enabled: true,
+                level: 2, // 0: desativado, 1: básico, 2: padrão, 3: avançado (preditivo)
+                range: 300, // Alcance do auto-aim
+                angleThreshold: 0.3 // Limiar de ângulo para ativar o auto-aim
+            },
+            weapons: [
+                { name: "Laser", damage: 10, cooldown: 200, color: "#ff0000", size: 3, speed: 12, type: "beam" },
+                { name: "Míssil", damage: 30, cooldown: 800, color: "#ff6000", size: 5, speed: 8, type: "missile" },
+                { name: "Plasma", damage: 20, cooldown: 400, color: "#40ffff", size: 4, speed: 10, type: "plasma" }
+            ],
+            graphics: {
+                quality: "medium", // low, medium, high
+                particleCount: 50,
+                shadowsEnabled: true,
+                celestialObjects: true
+            },
+            sound: {
+                volume: 0.5,
+                spatialAudio: true
+            },
+            performance: {
+                lastFrameTimes: [],
+                frameTimeHistorySize: 60,
+                shotsHit: 0,
+                shotsFired: 0
+            }
+        };
+        
+        // Elementos do DOM
+        const gameCanvas = document.getElementById('game-canvas');
+        const ctx = gameCanvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const levelElement = document.getElementById('level');
+        const weaponLevelElement = document.getElementById('weapon-level');
+        const themeElement = document.getElementById('current-theme');
+        const messageBox = document.getElementById('message-box');
+        const loadingScreen = document.getElementById('loading-screen');
+        const progressBar = document.getElementById('progress-bar');
+        const arm = document.getElementById('arm');
+        const mainMenu = document.getElementById('main-menu');
+        const settingsMenu = document.getElementById('settings-menu');
+        const newGameBtn = document.getElementById('new-game-btn');
+        const continueGameBtn = document.getElementById('continue-game-btn');
+        const settingsBtn = document.getElementById('settings-btn');
+        const settingsBackBtn = document.getElementById('settings-back-btn');
+        const deleteSaveBtn = document.getElementById('delete-save-btn');
+        const fpsElement = document.getElementById('fps');
+        const accuracyElement = document.getElementById('accuracy');
+        const responseTimeElement = document.getElementById('response-time');
+        const aimAssistLevelSelect = document.getElementById('aim-assist-level');
+        const graphicsQualitySelect = document.getElementById('graphics-quality');
+        const soundVolumeInput = document.getElementById('sound-volume');
+        const velocityFill = document.getElementById('velocity-fill');
+        const aimAssistIndicator = document.getElementById('aim-assist-indicator');
+        const radar = document.getElementById('radar');
+        
+        // Dimensões do canvas
+        let canvasWidth, canvasHeight;
+        
+        // Posição e física do braço
+        let armPosition = { x: 0, y: 0, z: 0 };
+        let armVelocity = { x: 0, y: 0, z: 0 };
+        let armRotation = { pitch: 0, yaw: 0, roll: 0 };
+        
+        // Posição do mouse
+        let mouseX = 0;
+        let mouseY = 0;
+        
+        // Controles
+        const keyMap = {
+            forward: false,
+            backward: false,
+            left: false,
+            right: false,
+            up: false,
+            down: false,
+            shoot: false,
+            cooldown: false,
+            boost: false,
+            switchWeapon: false
+        };
+        
+        // Arma atual
+        let currentWeaponIndex = 0;
+        
+        // Inimigos
+        let enemies = [];
+        
+        // Projéteis
+        let projectiles = [];
+        
+        // Objetos celestes (planetas, asteroides, nebulosas)
+        let celestialObjects = [];
+        
+        // Partículas
+        let particles = [];
+        
+        // Alvo atual para auto-aim
+        let currentTarget = null;
+        let targetingReticle = null;
+        
+        // Sons
+        const sounds = {
+            shoot: new Audio('data:audio/wav;base64,UklGRl9HAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAAABMSVNUHAAAAGluZm9JTkFNRQoAAABMYXNlciBGaXJlAFJJRkZHRwAAV0FWRWZtdCAQAAAAAQABAEAfAABAfwAAAQAIAABkYXRhA0cAAJOTlJWXmJqbnZ6goaKjpKWmp6ipqqusra6vsLGys7S1tre4ubq7vL2+v8DBwsPExcbHyMnKy8zNzs/Q0dLT1NXW19jZ2tvc3d7f4OHi4+Tl5ufo6err7O3u7/Dx8vP09fb3+Pn6+/z9/v8AAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8wMTIzNDU2Nzg5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXp7fH1+f4CBgoOEhYaHiImKi4yNjo+QkZKTlJWWl5iZmpucnZ6f'),
+            enemyHit: new Audio('data:audio/wav;base64,UklGRl9HAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAAABMSVNUHAAAAGluZm9JTkFNRQoAAABFbmVteSBIaXQAUklGRkdHAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAAGRhdGEDRwAAk5OUlZeYmpudn6ChoqOkpaanqKmqq6ytrq+wsbKztLW2t7i5uru8vb6/wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t/g4eLj5OXm5+jp6uvs7e7v8PHy8/T19vf4+fr7/P3+/wABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj9AQUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVpbXF1eX2BhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5ent8fX5/gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp8='),
+            levelUp: new Audio('data:audio/wav;base64,UklGRl9HAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAAABMSVNUHAAAAGluZm9JTkFNRQoAAABMZXZlbCBVcCAAUklGRkdHAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAAGRhdGEDRwAAk5OUlZeYmpudn6ChoqOkpaanqKmqq6ytrq+wsbKztLW2t7i5uru8vb6/wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t/g4eLj5OXm5+jp6uvs7e7v8PHy8/T19vf4+fr7/P3+/wABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj9AQUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVpbXF1eX2BhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5ent8fX5/gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp8='),
+            weaponUpgrade: new Audio('data:audio/wav;base64,UklGRl9HAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAAABMSVNUHAAAAGluZm9JTkFNRQoAAABVcGdyYWRlICAgAFJJRkZHRwAAV0FWRWZtdCAQAAAAAQABAEAfAABAfwAAAQAIAABkYXRhA0cAAJOTlJWXmJqbnZ+goaKjpKWmp6ipqqusra6vsLGys7S1tre4ubq7vL2+v8DBwsPExcbHyMnKy8zNzs/Q0dLT1NXW19jZ2tvc3d7f4OHi4+Tl5ufo6err7O3u7/Dx8vP09fb3+Pn6+/z9/v8AAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8wMTIzNDU2Nzg5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXp7fH1+f4CBgoOEhYaHiImKi4yNjo+QkZKTlJWWl5iZmpucnZ6f'),
+            background: new Audio('data:audio/wav;base64,UklGRl9HAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAAABMSVNUHAAAAGluZm9JTkFNRQoAAABCYWNrZ3JvdW5kAFJJRkZHRwAAV0FWRWZtdCAQAAAAAQABAEAfAABAfwAAAQAIAABkYXRhA0cAAJOTlJWXmJqbnZ+goaKjpKWmp6ipqqusra6vsLGys7S1tre4ubq7vL2+v8DBwsPExcbHyMnKy8zNzs/Q0dLT1NXW19jZ2tvc3d7f4OHi4+Tl5ufo6err7O3u7/Dx8vP09fb3+Pn6+/z9/v8AAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8wMTIzNDU2Nzg5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXp7fH1+f4CBgoOEhYaHiImKi4yNjo+QkZKTlJWWl5iZmpucnZ6f'),
+            thruster: new Audio('data:audio/wav;base64,UklGRl9HAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAAABMSVNUHAAAAGluZm9JTkFNRQoAAABUaHJ1c3RlciAgAFJJRkZHRwAAV0FWRWZtdCAQAAAAAQABAEAfAABAfwAAAQAIAABkYXRhA0cAAJOTlJWXmJqbnZ+goaKjpKWmp6ipqqusra6vsLGys7S1tre4ubq7vL2+v8DBwsPExcbHyMnKy8zNzs/Q0dLT1NXW19jZ2tvc3d7f4OHi4+Tl5ufo6err7O3u7/Dx8vP09fb3+Pn6+/z9/v8AAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8wMTIzNDU2Nzg5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXp7fH1+f4CBgoOEhYaHiImKi4yNjo+QkZKTlJWWl5iZmpucnZ6f'),
+            explosion: new Audio('data:audio/wav;base64,UklGRl9HAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAAABMSVNUHAAAAGluZm9JTkFNRQoAAABFeHBsb3Npb24gAFJJRkZHRwAAV0FWRWZtdCAQAAAAAQABAEAfAABAfwAAAQAIAABkYXRhA0cAAJOTlJWXmJqbnZ+goaKjpKWmp6ipqqusra6vsLGys7S1tre4ubq7vL2+v8DBwsPExcbHyMnKy8zNzs/Q0dLT1NXW19jZ2tvc3d7f4OHi4+Tl5ufo6err7O3u7/Dx8vP09fb3+Pn6+/z9/v8AAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8wMTIzNDU2Nzg5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXp7fH1+f4CBgoOEhYaHiImKi4yNjo+QkZKTlJWWl5iZmpucnZ6f'),
+            missile: new Audio('data:audio/wav;base64,UklGRl9HAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAAABMSVNUHAAAAGluZm9JTkFNRQoAAABNaXNzaWxlICAgAFJJRkZHRwAAV0FWRWZtdCAQAAAAAQABAEAfAABAfwAAAQAIAABkYXRhA0cAAJOTlJWXmJqbnZ+goaKjpKWmp6ipqqusra6vsLGys7S1tre4ubq7vL2+v8DBwsPExcbHyMnKy8zNzs/Q0dLT1NXW19jZ2tvc3d7f4OHi4+Tl5ufo6err7O3u7/Dx8vP09fb3+Pn6+/z9/v8AAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8wMTIzNDU2Nzg5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXp7fH1+f4CBgoOEhYaHiImKi4yNjo+QkZKTlJWWl5iZmpucnZ6f'),
+            warning: new Audio('data:audio/wav;base64,UklGRl9HAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAAABMSVNUHAAAAGluZm9JTkFNRQoAAABXYXJuaW5nICAgAFJJRkZHRwAAV0FWRWZtdCAQAAAAAQABAEAfAABAfwAAAQAIAABkYXRhA0cAAJOTlJWXmJqbnZ+goaKjpKWmp6ipqqusra6vsLGys7S1tre4ubq7vL2+v8DBwsPExcbHyMnKy8zNzs/Q0dLT1NXW19jZ2tvc3d7f4OHi4+Tl5ufo6err7O3u7/Dx8vP09fb3+Pn6+/z9/v8AAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8wMTIzNDU2Nzg5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZG'),
+            warning: new Audio('data:audio/wav;base64,UklGRl9HAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAAABMSVNUHAAAAGluZm9JTkFNRQoAAABXYXJuaW5nICAgAFJJRkZHRwAAV0FWRWZtdCAQAAAAAQABAEAfAABAfwAAAQAIAABkYXRhA0cAAJOTlJWXmJqbnZ+goaKjpKWmp6ipqqusra6vsLGys7S1tre4ubq7vL2+v8DBwsPExcbHyMnKy8zNzs/Q0dLT1NXW19jZ2tvc3d7f4OHi4+Tl5ufo6err7O3u7/Dx8vP09fb3+Pn6+/z9/v8AAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8wMTIzNDU2Nzg5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZG')
+        };
+        Model Request failed, please try again later.

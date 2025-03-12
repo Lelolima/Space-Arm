@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: 'Orbitron', sans-serif;
+            background-color: #0a0a1a;
+            color: #e0e0ff;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            margin: 0;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" fill="%230a0a1a"/><g fill="%23ffffff" opacity="0.3"><circle cx="25" cy="25" r="1"/><circle cx="75" cy="50" r="0.8"/><circle cx="125" cy="100" r="1.2"/><circle cx="175" cy="150" r="0.6"/><circle cx="225" cy="200" r="1"/><circle cx="275" cy="250" r="0.7"/><circle cx="325" cy="300" r="1.1"/><circle cx="375" cy="350" r="0.9"/><circle cx="50" cy="375" r="0.8"/><circle cx="100" cy="325" r="1"/><circle cx="150" cy="275" r="0.7"/><circle cx="200" cy="225" r="1.2"/><circle cx="250" cy="175" r="0.6"/><circle cx="300" cy="125" r="1"/><circle cx="350" cy="75" r="0.9"/></g></svg>');
+            background-repeat: repeat;
+            animation: space-move 60s linear infinite;
+        }
+
+        @keyframes space-move {
+            from { background-position: 0 0; }
+            to { background-position: 1000px 1000px; }
+        }
+
+        .menu-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 30, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            z-index: 11;
+        }
+
+        .menu-screen button {
+            padding: 15px 30px;
+            font-size: 1.2em;
+            background-color: #1a1a4a;
+            color: #e0e0ff;
+            border: 2px solid #4080ff;
+            border-radius: 10px;
+            cursor: pointer;
+            font-family: 'Orbitron', sans-serif;
+            transition: all 0.3s ease;
+        }
+
+        .menu-screen button:hover {
+            background-color: #4080ff;
+            box-shadow: 0 0 15px #4080ff;
+        }
+
+        .menu-screen button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        #game-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #game-info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background-color: rgba(0, 0, 30, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #4080ff;
+            pointer-events: auto;
+        }
+
+        #theme-info {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background-color: rgba(0, 0, 30, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #4080ff;
+            pointer-events: auto;
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            background-color: rgba(0, 0, 30, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #4080ff;
+            pointer-events: auto;
+        }
+
+        .control-key {
+            display: inline-block;
+            background-color: #1a1a4a;
+            color: #e0e0ff;
+            padding: 10px 15px;
+            border-radius: 5px;
+            border: 1px solid #4080ff;
+            min-width: 40px;
+            text-align: center;
+            margin-right: 5px;
+        }
+
+        #message-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 30, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #4080ff;
+            font-size: 1.5em;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            pointer-events: none;
+        }
+
+        #loading-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #0a0a1a;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 12;
+        }
+
+        #loading-progress {
+            width: 300px;
+            height: 20px;
+            background-color: #1a1a4a;
+            border-radius: 10px;
+            margin-top: 20px;
+            overflow: hidden;
+        }
+
+        #progress-bar {
+            height: 100%;
+            width: 0%;
+            background-color: #4080ff;
+            transition: width 0.3s ease;
+        }
+
+        .enemy {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background-color: red;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 15px red;
+            transition: box-shadow 0.3s ease;
+        }
+
+        .projectile {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #ff6000;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 10px #ff9000;
+        }
+
+        .explosion {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            background-color: orange;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 20px yellow;
+            opacity: 1;
+            transition: all 0.3s ease-out;
+        }
+        
+        #arm {
+            position: absolute;
+            width: 120px;
+            height: 120px;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><defs><linearGradient id="bodyGradient" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%23303f9f" /><stop offset="100%" stop-color="%231a237e" /></linearGradient><linearGradient id="cockpitGradient" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%2381d4fa" /><stop offset="100%" stop-color="%2329b6f6" /></linearGradient><filter id="glow"><feGaussianBlur stdDeviation="1.5" result="blur" /><feComposite in="SourceGraphic" in2="blur" operator="over" /></filter><filter id="engineGlow"><feGaussianBlur stdDeviation="2" result="blur" /><feComposite in="SourceGraphic" in2="blur" operator="over" /></filter></defs><!-- Main Body --><path d="M60,20 L75,40 L90,45 L75,50 L60,80 L45,50 L30,45 L45,40 Z" fill="url(%23bodyGradient)" stroke="%23e0e0ff" stroke-width="1.5"/><!-- Wings --><path d="M60,40 L90,50 L95,60 L60,55 Z" fill="%232c387e" stroke="%23e0e0ff" stroke-width="1"/><!-- Left Wing --><path d="M60,40 L30,50 L25,60 L60,55 Z" fill="%232c387e" stroke="%23e0e0ff" stroke-width="1"/><!-- Tail Fins --><path d="M60,65 L70,75 L65,85 L60,80 Z" fill="%232c387e" stroke="%23e0e0ff" stroke-width="0.8"/><!-- Left Tail Fin --><path d="M60,65 L50,75 L55,85 L60,80 Z" fill="%232c387e" stroke="%23e0e0ff" stroke-width="0.8"/><!-- Cockpit --><path d="M60,30 L65,40 L60,50 L55,40 Z" fill="url(%23cockpitGradient)" stroke="%23e0e0ff" stroke-width="0.8"/><!-- Weapon Mounts Right --><path d="M75,45 L85,47 L85,49 L75,47 Z" fill="%23424242" stroke="%23e0e0ff" stroke-width="0.5"/><!-- Weapon Mounts Left --><path d="M45,45 L35,47 L35,49 L45,47 Z" fill="%23424242" stroke="%23e0e0ff" stroke-width="0.5"/><!-- Afterburner Effects --><circle cx="60" cy="85" r="4" fill="%23ff6000" filter="url(%23engineGlow)" /><!-- Side Afterburner Effects --><circle cx="56" cy="83" r="2.5" fill="%23ff9000" filter="url(%23engineGlow)" /><circle cx="64" cy="83" r="2.5" fill="%23ff9000" filter="url(%23engineGlow)" /><!-- Weapon Details --><circle cx="85" cy="48" r="1.5" fill="%23ff0000" filter="url(%23glow)" /><circle cx="35" cy="48" r="1.5" fill="%23ff0000" filter="url(%23glow)" /><!-- Panel Lines --><path d="M60,25 L60,75" stroke="%23e0e0ff" stroke-width="0.3" opacity="0.7"/><path d="M50,45 L70,45" stroke="%23e0e0ff" stroke-width="0.3" opacity="0.7"/><path d="M55,35 L65,35" stroke="%23e0e0ff" stroke-width="0.3" opacity="0.7"/></svg>');
+            background-size: contain;
+            background-repeat: no-repeat;
+            transform: translate(-50%, -50%) rotate(0deg);
+            z-index: 3;
+            animation: fighter-pulse 2s infinite;
+            transition: transform 0.2s ease;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 15px #4080ff; }
+            50% { box-shadow: 0 0 25px #4080ff; }
+            100% { box-shadow: 0 0 15px #4080ff; }
+        }
+        
+        @keyframes fighter-pulse {
+            0% { box-shadow: 0 0 15px #4080ff; }
+            50% { box-shadow: 0 0 25px #ff6000, 0 0 35px #4080ff; }
+            100% { box-shadow: 0 0 15px #4080ff; }
+        }
+        
+        @keyframes explosion-pulse {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(2); opacity: 0; }
+        }
+        
+        @keyframes rotate {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+        
+        @media (max-width: 768px) {
+            #game-info, #theme-info {
+                padding: 10px;
+                font-size: 0.9em;
+            }
+            
+            #controls {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            
+            .control-key {
+                padding: 8px 12px;
+                min-width: 30px;
+            }
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="main-menu" class="menu-screen">
+        <h1>SPACE ARM</h1>
+        <button id="new-game-btn">Novo Jogo</button>
+        <button id="continue-game-btn">Continuar</button>
+        <button id="delete-save-btn">Deletar Save</button>
+    </div>
+    
+    <div id="game-container">
+        <canvas id="game-canvas"></canvas>
+        
+        <div id="ui-overlay">
+            <div id="game-info">
+                <div id="score">Score: 0</div>
+                <div id="level">Level: 1</div>
+                <div id="weapon-level">Arma: Nível 1</div>
+            </div>
+            
+            <div id="theme-info">
+                <div id="current-theme">Tema: Guerra Espacial</div>
+            </div>
+            
+            <div id="controls">
+                <div><span class="control-key">W</span> <span class="control-desc">Frente</span></div>
+                <div><span class="control-key">S</span> <span class="control-desc">Trás</span></div>
+                <div><span class="control-key">A</span> <span class="control-desc">Esquerda</span></div>
+                <div><span class="control-key">D</span> <span class="control-desc">Direita</span></div>
+                <div><span class="control-key">Q</span> <span class="control-desc">Subir</span></div>
+                <div><span class="control-key">E</span> <span class="control-desc">Descer</span></div>
+                <div><span class="control-key">SPACE</span> <span class="control-desc">Atirar</span></div>
+            </div>
+            
+            <div id="message-box"></div>
+            
+            <div id="arm"></div>
+        </div>
+        
+        <div id="loading-screen">
+            <h1>SPACE ARM</h1>
+            <p>Carregando recursos do jogo...</p>
+            <div id="loading-progress">
+                <div id="progress-bar"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="save_system.js"></script>
+    <script>
+        // Configurações do jogo
+        const gameConfig = {
+            level: 1,
+            weaponLevel: 1,
+            maxWeaponLevel: 5,
+            score: 0,
+            isGameRunning: true,
+            levelThemes: {
+                1: "Guerra Espacial",
+                2: "Batalha Intergaláctica",
+                3: "Conflito Estelar",
+                4: "Combate Orbital"
+            },
+            enemySpeed: 1.5,
+            enemySpawnRate: 2000, // ms
+            projectileSpeed: 8,
+            armSpeed: 5
+        };
+        
+        // Elementos do DOM
+        const gameCanvas = document.getElementById('game-canvas');
+        const ctx = gameCanvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const levelElement = document.getElementById('level');
+        const weaponLevelElement = document.getElementById('weapon-level');
+        const themeElement = document.getElementById('current-theme');
+        const messageBox = document.getElementById('message-box');
+        const loadingScreen = document.getElementById('loading-screen');
+        const progressBar = document.getElementById('progress-bar');
+        const arm = document.getElementById('arm');
+        const mainMenu = document.getElementById('main-menu');
+        const newGameBtn = document.getElementById('new-game-btn');
+        const continueGameBtn = document.getElementById('continue-game-btn');
+        const deleteSaveBtn = document.getElementById('delete-save-btn');
+        
+        // Dimensões do canvas
+        let canvasWidth, canvasHeight;
+        
+        // Posição do braço
+        let armPosition = { x: 0, y: 0, z: 0 };
+        
+        // Posição do mouse
+        let mouseX = 0;
+        let mouseY = 0;
+        
+        // Controles
+        const keyMap = {
+            forward: false,
+            backward: false,
+            left: false,
+            right: false,
+            up: false,
+            down: false,
+            shoot: false,
+            cooldown: false
+        };
+        
+        // Inimigos
+        let enemies = [];
+        
+        // Projéteis
+        let projectiles = [];
+        
+        // Sons
+        const sounds = {
+            shoot: null,
+            enemyHit: null,
+            levelUp: null,
+            weaponUpgrade: null,
+            background: null
+        };
+        
+        // Recursos do jogo
+        const resources = {
+            images: {},
+            sounds: {},
+            total: 10, // Total de recursos a serem carregados
+            loaded: 0
+        };
+        
+        // Timers e IDs de animação
+        let gameLoopId = null;
+        let enemySpawnerId = null;
+        let lastTime = 0;
+        
+        // Inicialização do jogo
+        function initGame() {
+            // Configurar o tamanho do canvas
+            resizeCanvas();
+            
+            // Inicializar sons
+            initSounds();
+            
+            // Configurar eventos
+            setupEventListeners();
+            
+            // Iniciar spawner de inimigos
+            startEnemySpawner();
+            
+            // Carregar recursos e iniciar o loop do jogo
+            loadResources();
+        }
+        
+        // Verificar se há um jogo salvo
+        function checkSavedGame() {
+            const savedGame = SaveSystem.load('spaceArmGame');
+            if (savedGame) {
+                continueGameBtn.disabled = false;
+                deleteSaveBtn.disabled = false;
+            } else {
+                continueGameBtn.disabled = true;
+                deleteSaveBtn.disabled = true;
+            }
+        }
+        
+        // Iniciar novo jogo
+        function startNewGame() {
+            // Resetar configurações
+            gameConfig.level = 1;
+            gameConfig.weaponLevel = 1;
+            gameConfig.score = 0;
+            gameConfig.isGameRunning = true;
+            
+            // Atualizar UI
+            scoreElement.textContent = `Score: ${gameConfig.score}`;
+            levelElement.textContent = `Level: ${gameConfig.level}`;
+            weaponLevelElement.textContent = `Arma: Nível ${gameConfig.weaponLevel}`;
+            themeElement.textContent = `Tema: ${gameConfig.levelThemes[1]}`;
+            
+            // Limpar inimigos e projéteis
+            clearEntities();
+            
+            // Esconder menu
+            mainMenu.style.display = 'none';
+            
+            // Iniciar jogo
+            initGame();
+        }
+        
+        // Continuar jogo salvo
+        function continueGame() {
+            const savedGame = SaveSystem.load('spaceArmGame');
+            if (savedGame) {
+                // Carregar configurações
+                gameConfig.level = savedGame.level;
+                gameConfig.weaponLevel = savedGame.weaponLevel;
+                gameConfig.score = savedGame.score;
+                gameConfig.isGameRunning = true;
+                
+                // Atualizar UI
+                scoreElement.textContent = `Score: ${gameConfig.score}`;
+                levelElement.textContent = `Level: ${gameConfig.level}`;
+                weaponLevelElement.textContent = `Arma: Nível ${gameConfig.weaponLevel}`;
+                themeElement.textContent = `Tema: ${gameConfig.levelThemes[gameConfig.level] || 'Guerra Espacial'}`;
+                
+                // Limpar inimigos e projéteis
+                clearEntities();
+                
+                // Esconder menu
+                mainMenu.style.display = 'none';
+                
+                // Iniciar jogo
+                initGame();
+            }
+        }
+        
+        // Deletar jogo salvo
+        function deleteSavedGame() {
+            SaveSystem.delete('spaceArmGame');
+            continueGameBtn.disabled = true;
+            deleteSaveBtn.disabled = true;
+        }
+        
+        // Salvar jogo
+        function saveGame() {
+            const gameData = {
+                level: gameConfig.level,
+                weaponLevel: gameConfig.weaponLevel,
+                score: gameConfig.score
+            };
+            SaveSystem.save('spaceArmGame', gameData);
+        }
+        
+        // Limpar entidades
+        function clearEntities() {
+            // Remover inimigos
+            for (const enemy of enemies) {
+                enemy.element.remove();
+            }
+            enemies = [];
+            
+            // Remover projéteis
+            for (const projectile of projectiles) {
+                projectile.element.remove();
+            }
+            projectiles = [];
+        }
+        
+        function initSounds() {
+            // Criar objetos de áudio vazios
+            sounds.shoot = new Audio();
+            sounds.enemyHit = new Audio();
+            sounds.levelUp = new Audio();
+            sounds.weaponUpgrade = new Audio();
+            sounds.background = new Audio();
+            
+            // Configurar volume
+            Object.values(sounds).forEach(sound => {
+                if (sound) {
+                    sound.volume = 0.3;
+                }
+            });
+            
+            // Adicionar tratamento de erros para evitar problemas com áudio
+            Object.values(sounds).forEach(sound => {
+                sound.onerror = function() {
+                    console.log('Erro ao carregar som, silenciando');
+                    this.error = null;
+                    return true; // Evita que o erro seja propagado
+                };
+            });
+        }
+        
+        // Loop principal do jogo
+        function gameLoop(timestamp) {
+            // Calcular delta time para movimento suave
+            const deltaTime = timestamp - lastTime;
+            lastTime = timestamp;
+            
+            // Atualizar posição do braço com base nos controles
+            if (keyMap.forward) armPosition.y -= gameConfig.armSpeed * (deltaTime / 16);
+            if (keyMap.backward) armPosition.y += gameConfig.armSpeed * (deltaTime / 16);
+            if (keyMap.left) armPosition.x -= gameConfig.armSpeed * (deltaTime / 16);
+            if (keyMap.right) armPosition.x += gameConfig.armSpeed * (deltaTime / 16);
+            if (keyMap.up) armPosition.z += gameConfig.armSpeed * (deltaTime / 16);
+            if (keyMap.down) armPosition.z -= gameConfig.armSpeed * (deltaTime / 16);
+            
+            // Limitar posição do braço dentro da tela
+            armPosition.x = Math.max(0, Math.min(canvasWidth, armPosition.x));
+            armPosition.y = Math.max(0, Math.min(canvasHeight, armPosition.y));
+            armPosition.z = Math.max(0, Math.min(1000, armPosition.z));
+            
+            // Verificar se deve atirar
+            if (keyMap.shoot && !keyMap.cooldown) {
+                shootProjectile();
+            }
+            
+            // Atualizar posição visual do braço
+            updateArmPosition();
+            
+            // Atualizar projéteis
+            updateProjectiles(deltaTime);
+            
+            // Atualizar inimigos
+            updateEnemies(deltaTime);
+            
+            // Verificar colisões
+            checkCollisions();
+            
+            // Continuar o loop se o jogo estiver rodando
+            if (gameConfig.isGameRunning) {
+                gameLoopId = requestAnimationFrame(gameLoop);
+            }
+        }
+        
+        // Atualizar projéteis
+        function updateProjectiles(deltaTime) {
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                const projectile = projectiles[i];
+                
+                // Mover projétil na direção do ângulo
+                projectile.x += Math.cos(projectile.angle) * projectile.speed * (deltaTime / 16);
+                projectile.y += Math.sin(projectile.angle) * projectile.speed * (deltaTime / 16);
+                
+                // Remover projéteis fora da tela
+                if (projectile.x < -50 || projectile.x > canvasWidth + 50 || 
+                    projectile.y < -50 || projectile.y > canvasHeight + 50) {
+                    projectile.element.remove();
+                    projectiles.splice(i, 1);
+                    continue;
+                }
+                
+                // Atualizar posição visual
+                updateProjectilePosition(projectile);
+            }
+        }
+        
+        // Atualizar inimigos
+        function updateEnemies(deltaTime) {
+            for (const enemy of enemies) {
+                // Calcular direção para o braço
+                const dx = armPosition.x - enemy.x;
+                const dy = armPosition.y - enemy.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                // Normalizar e aplicar velocidade
+                if (distance > 0) {
+                    enemy.x += (dx / distance) * enemy.speed * (deltaTime / 16);
+                    enemy.y += (dy / distance) * enemy.speed * (deltaTime / 16);
+                }
+                
+                // Atualizar posição visual
+                updateEnemyPosition(enemy);
+            }
+        }
+        
+        // Iniciar o jogo automaticamente quando a página carregar
+        window.addEventListener('load', function() {
+            // Verificar se há um jogo salvo
+            checkSavedGame();
+            
+            // Configurar botões do menu
+            newGameBtn.addEventListener('click', startNewGame);
+            continueGameBtn.addEventListener('click', continueGame);
+            deleteSaveBtn.addEventListener('click', deleteSavedGame);
+            
+            // Simular carregamento
+            let progress = 0;
+            const loadingInterval = setInterval(() => {
+                progress += 5;
+                progressBar.style.width = `${progress}%`;
+                
+                if (progress >= 100) {
+                    clearInterval(loadingInterval);
+                    loadingScreen.style.display = 'none';
+                }
+            }, 100);
+        });
+        
+        // Redimensionar o canvas
+        function resizeCanvas() {
+            canvasWidth = window.innerWidth;
+            canvasHeight = window.innerHeight;
+            gameCanvas.width = canvasWidth;
+            gameCanvas.height = canvasHeight;
+            
+            // Centralizar o braço inicialmente
+            armPosition.x = canvasWidth / 2;
+            armPosition.y = canvasHeight / 2;
+            updateArmPosition();
+        }
+        
+        // Criar inimigo
+        function createEnemy() {
+            // Posição aleatória fora da tela
+            let x, y;
+            const side = Math.floor(Math.random() * 4); // 0: top, 1: right, 2: bottom, 3: left
+            
+            switch (side) {
+                case 0: // top
+                    x = Math.random() * canvasWidth;
+                    y = -50;
+                    break;
+                case 1: // right
+                    x = canvasWidth + 50;
+                    y = Math.random() * canvasHeight;
+                    break;
+                case 2: // bottom
+                    x = Math.random() * canvasWidth;
+                    y = canvasHeight + 50;
+                    break;
+                case 3: // left
+                    x = -50;
+                    y = Math.random() * canvasHeight;
+                    break;
+            }
+            
+            // Criar elemento do inimigo
+            const enemyElement = document.createElement('div');
+            enemyElement.className = 'enemy';
+            document.getElementById('ui-overlay').appendChild(enemyElement);
+            
+            // Adicionar à lista de inimigos
+            const enemy = {
+                x,
+                y,
+                speed: gameConfig.enemySpeed * (0.8 + Math.random() * 0.4), // Variação na velocidade
+                element: enemyElement
+            };
+            
+            enemies.push(enemy);
+            updateEnemyPosition(enemy);
+        }
+        
+        // Atualizar posição visual do inimigo
+        function updateEnemyPosition(enemy) {
+            // Calcular tamanho baseado na distância Z (perspectiva)
+            const scale = Math.max(0.5, Math.min(1.5, 1 - armPosition.z / 1000));
+            const size = 50 * scale;
+            
+            enemy.element.style.left = `${enemy.x}px`;
+            enemy.element.style.top = `${enemy.y}px`;
+            enemy.element.style.width = `${size}px`;
+            enemy.element.style.height = `${size}px`;
+        }
+        
+        // Atualizar posição visual do braço
+        function updateArmPosition() {
+            // Calcular tamanho baseado na distância Z (perspectiva)
+            const scale = Math.max(0.5, Math.min(1.5, 1 - armPosition.z / 1000));
+            const size = 120 * scale;
+            
+            // Calcular ângulo para o mouse (para que o caça aponte para frente na direção do movimento)
+            let angle = 0;
+            if (keyMap.forward || keyMap.backward || keyMap.left || keyMap.right) {
+                const dx = keyMap.right ? 1 : (keyMap.left ? -1 : 0);
+                const dy = keyMap.backward ? 1 : (keyMap.forward ? -1 : 0);
+                angle = Math.atan2(dy, dx);
+            }
+            
+            arm.style.left = `${armPosition.x}px`;
+            arm.style.top = `${armPosition.y}px`;
+            arm.style.width = `${size}px`;
+            arm.style.height = `${size}px`;
+            arm.style.transform = `translate(-50%, -50%) rotate(${angle}rad)`;
+        }
+        
+        // Atirar projétil
+        function shootProjectile() {
+            if (keyMap.cooldown) return;
+            
+            // Criar elemento do projétil
+            const projectileElement = document.createElement('div');
+            projectileElement.className = 'projectile';
+            document.getElementById('ui-overlay').appendChild(projectileElement);
+            
+            // Calcular ângulo para o mouse ou direção do movimento
+            let angle = 0;
+            if (keyMap.forward || keyMap.backward || keyMap.left || keyMap.right) {
+                const dx = keyMap.right ? 1 : (keyMap.left ? -1 : 0);
+                const dy = keyMap.backward ? 1 : (keyMap.forward ? -1 : 0);
+                angle = Math.atan2(dy, dx);
+            } else {
+                const dx = mouseX - armPosition.x;
+                const dy = mouseY - armPosition.y;
+                angle = Math.atan2(dy, dx);
+            }
+            
+            // Adicionar à lista de projéteis
+            const projectile = {
+                x: armPosition.x,
+                y: armPosition.y,
+                angle,
+                speed: gameConfig.projectileSpeed,
+                element: projectileElement
+            };
+            
+            projectiles.push(projectile);
+            updateProjectilePosition(projectile);
+            
+            // Tocar som
+            sounds.shoot.currentTime = 0;
+            sounds.shoot.play();
+            
+            // Cooldown
+            keyMap.cooldown = true;
+            setTimeout(() => {
+                keyMap.cooldown = false;
+            }, 200 / gameConfig.weaponLevel); // Cooldown reduz com nível da arma
+        }
+        
+        // Atualizar posição visual do projétil
+        function updateProjectilePosition(projectile) {
+            projectile.element.style.left = `${projectile.x}px`;
+            projectile.element.style.top = `${projectile.y}px`;
+        }
+        
+        // Iniciar spawner de inimigos
+        function startEnemySpawner() {
+            enemySpawnerId = setInterval(() => {
+                if (gameConfig.isGameRunning) {
+                    createEnemy();
+                }
+            }, gameConfig.enemySpawnRate);
+        }
+        
+        // Verificar colisões
+        function checkCollisions() {
+            // Verificar colisões entre projéteis e inimigos
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                const projectile = projectiles[i];
+                
+                // Verificar colisão com inimigos
+                for (let j = enemies.length - 1; j >= 0; j--) {
+                    const enemy = enemies[j];
+                    const dx = projectile.x - enemy.x;
+                    const dy = projectile.y - enemy.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < 30) { // Raio de colisão
+                        // Criar explosão
+                        createExplosion(enemy.x, enemy.y);
+                        
+                        // Remover projétil
+                        projectile.element.remove();
+                        projectiles.splice(i, 1);
+                        
+                        // Remover inimigo
+                        enemy.element.remove();
+                        enemies.splice(j, 1);
+                        
+                        // Aumentar pontuação
+                        gameConfig.score += 10;
+                        scoreElement.textContent = `Score: ${gameConfig.score}`;
+                        
+                        // Verificar upgrade de arma
+                        if (gameConfig.score % 100 === 0 && gameConfig.weaponLevel < gameConfig.maxWeaponLevel) {
+                            gameConfig.weaponLevel++;
+                            weaponLevelElement.textContent = `Arma: Nível ${gameConfig.weaponLevel}`;
+                            showMessage("Arma melhorada!");
+                            sounds.weaponUpgrade.play();
+                        }
+                        
+                        // Verificar próximo nível
+                        if (gameConfig.score % 500 === 0) {
+                            gameConfig.level++;
+                            levelElement.textContent = `Level: ${gameConfig.level}`;
+                            
+                            // Atualizar tema
+                            const theme = gameConfig.levelThemes[gameConfig.level] || "Guerra Espacial";
+                            themeElement.textContent = `Tema: ${theme}`;
+                            
+                            // Aumentar dificuldade
+                            gameConfig.enemySpeed += 0.5;
+                            gameConfig.enemySpawnRate = Math.max(500, gameConfig.enemySpawnRate - 200);
+                            
+                            // Reiniciar spawner com nova taxa
+                            clearInterval(enemySpawnerId);
+                            startEnemySpawner();
+                            
+                            showMessage(`Nível ${gameConfig.level} alcançado!`);
+                            sounds.levelUp.play();
+                            
+                            // Salvar jogo
+                            saveGame();
+                        }
+                        
+                        // Tocar som
+                        sounds.enemyHit.play();
+                        
+                        break;
+                    }
+                }
+            }
+            
+            // Verificar colisões entre inimigos e braço
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const enemy = enemies[i];
+                const dx = armPosition.x - enemy.x;
+                const dy = armPosition.y - enemy.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < 40) { // Raio de colisão
+                    // Game over
+                    gameConfig.isGameRunning = false;
+                    showMessage("Game Over! Recarregue para jogar novamente.");
+                    clearInterval(enemySpawnerId);
+                    break;
+                }
+            }
+        }
+        
+        // Criar explosão
+        function createExplosion(x, y) {
+            const explosionElement = document.createElement('div');
+            explosionElement.className = 'explosion';
+            explosionElement.style.left = `${x}px`;
+            explosionElement.style.top = `${y}px`;
+            document.getElementById('ui-overlay').appendChild(explosionElement);
+            
+            // Animar explosão
+            explosionElement.style.animation = 'explosion-pulse 0.5s forwards';
+            
+            // Remover após animação
+            setTimeout(() => {
+                explosionElement.remove();
+            }, 500);
+        }
+        
+        // Mostrar mensagem
+        function showMessage(text) {
+            messageBox.textContent = text;
+            messageBox.style.opacity = 1;
+            
+            setTimeout(() => {
+                messageBox.style.opacity = 0;
+            }, 3000);
+        }
+        
+        // Carregar recursos do jogo
+        function loadResources() {
+            // Simular carregamento de recursos
+            let loaded = 0;
+            const interval = setInterval(() => {
+                loaded++;
+                progressBar.style.width = `${(loaded / resources.total) * 100}%`;
+                
+                if (loaded >= resources.total) {
+                    clearInterval(interval);
+                    loadingScreen.style.display = 'none';
+                    // Iniciar loop do jogo
+                    lastTime = performance.now();
+                    gameLoopId = requestAnimationFrame(gameLoop);
+                }
+            }, 100);
+        }
+        
+        // Configurar eventos
+        function setupEventListeners() {
+            // Eventos de teclado
+            window.addEventListener('keydown', (e) => {
+                switch (e.key.toLowerCase()) {
+                    case 'w': keyMap.forward = true; break;
+                    case 's': keyMap.backward = true; break;
+                    case 'a': keyMap.left = true; break;
+                    case 'd': keyMap.right = true; break;
+                    case 'q': keyMap.up = true; break;
+                    case 'e': keyMap.down = true; break;
+                    case ' ': keyMap.shoot = true; break;
+                }
+            });
+            
+            window.addEventListener('keyup', (e) => {
+                switch (e.key.toLowerCase()) {
+                    case 'w': keyMap.forward = false; break;
+                    case 's': keyMap.backward = false; break;
+                    case 'a': keyMap.left = false; break;
+                    case 'd': keyMap.right = false; break;
+                    case 'q': keyMap.up = false; break;
+                    case 'e': keyMap.down = false; break;
+                    case ' ': keyMap.shoot = false; break;
+                }
+            });
+            
+            // Eventos de mouse
+            window.addEventListener('mousemove', (e) => {
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+            });
+            
+            window.addEventListener('mousedown', () => {
+                keyMap.shoot = true;
+            });
+            
+            window.addEventListener('mouseup', () => {
+                keyMap.shoot = false;
+            });
+            
+            // Evento de redimensionamento
+            window.addEventListener('resize', resizeCanvas);
+        }
+    </script>
+</body>
+</html>

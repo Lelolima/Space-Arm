@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+body {
+    font-family: 'Orbitron', sans-serif;
+    background-color: #0a0a1a;
+    color: #e0e0ff;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+.menu-screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 30, 0.9);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    z-index: 11;
+}
+
+.menu-screen button {
+    padding: 15px 30px;
+    font-size: 1.2em;
+    background-color: #1a1a4a;
+    color: #e0e0ff;
+    border: 2px solid #4080ff;
+    border-radius: 10px;
+    cursor: pointer;
+    font-family: 'Orbitron', sans-serif;
+    transition: all 0.3s ease;
+}
+
+.menu-screen button:hover {
+    background-color: #4080ff;
+    box-shadow: 0 0 15px #4080ff;
+}
+
+.menu-screen button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+#map-canvas {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    width: 200px;
+    height: 200px;
+    border: 2px solid rgba(64, 128, 255, 0.7);
+    border-radius: 5px;
+    background-color: rgba(0, 10, 30, 0.7);
+    z-index: 2;
+}
+.enemy {
+    position: absolute;
+    width: 50px;
+    height: 50px;
+    background-color: red;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 15px red;
+    transition: box-shadow 0.3s ease;
+}
+
+.projectile {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background-color: #4080ff;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 10px #4080ff;
+}
+
+.explosion {
+    position: absolute;
+    width: 60px;
+    height: 60px;
+    background-color: orange;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 20px yellow;
+    opacity: 1;
+    transition: all 0.3s ease-out;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(2); opacity: 0; }
+}
+
+@keyframes rotate {
+    0% { transform: translate(-50%, -50%) rotate(0deg); }
+    100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="main-menu" class="menu-screen">
+        <h1>SPACE ARM</h1>
+        <button id="new-game-btn">Novo Jogo</button>
+        <button id="continue-game-btn">Continuar</button>
+        <button id="delete-save-btn">Deletar Save</button>
+    </div>
+    
+    <div id="game-container">
+        <canvas id="game-canvas"></canvas>
+        <canvas id="map-canvas"></canvas>
+        
+        <div id="ui-overlay">
+            <div id="game-info">
+                <div id="score">Score: 0</div>
+                <div id="level">Level: 1</div>
+                <div id="weapon-level">Arma: Nível 1</div>
+            </div>
+            
+            <div id="theme-info">
+                <div id="current-theme">Tema: Terror</div>
+            </div>
+            
+            <div id="controls">
+                <div><span class="control-key">W</span> <span class="control-desc">Frente</span></div>
+                <div><span class="control-key">S</span> <span class="control-desc">Trás</span></div>
+                <div><span class="control-key">A</span> <span class="control-desc">Esquerda</span></div>
+                <div><span class="control-key">D</span> <span class="control-desc">Direita</span></div>
+                <div><span class="control-key">Q</span> <span class="control-desc">Subir</span></div>
+                <div><span class="control-key">E</span> <span class="control-desc">Descer</span></div>
+                <div><span class="control-key">SPACE</span> <span class="control-desc">Atirar</span></div>
+            </div>
+            
+            <div id="message-box"></div>
+            
+            <div id="arm"></div>
+        </div>
+        
+        <div id="loading-screen">
+            <h1>SPACE ARM</h1>
+            <p>Carregando recursos do jogo...</p>
+            <div id="loading-progress">
+                <div id="progress-bar"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="save_system.js"></script>
+    <script src="enhanced_physics.js"></script>
+    <script src="game_assets.js"></script>
+    <script src="interactive_map.js"></script>
+    <script>
+        // Configurações do jogo
+        const gameConfig = {
+            level: 1,
+            weaponLevel: 1,
+            maxWeaponLevel: 5,
+            score: 0,
+            isGameRunning: true,
+            levelThemes: {
+                1: "terror",
+                2: "fantasia",
+                3: "suspense",
+                4: "animado"
+            },
+            enemySpeed: 1.5,
+            enemySpawnRate: 2000, // ms
+            projectileSpeed: 8,
+            armSpeed: 5
+        };
+        
+        // Elementos do DOM
+        const gameCanvas = document.getElementById('game-canvas');
+        const ctx = gameCanvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const levelElement = document.getElementById('level');
+        const weaponLevelElement = document.getElementById('weapon-level');
+        const themeElement = document.getElementById('current-theme');
+        const messageBox = document.getElementById('message-box');
+        const loadingScreen = document.getElementById('loading-screen');
+        const progressBar = document.getElementById('progress-bar');
+        const arm = document.getElementById('arm');
+        const mainMenu = document.getElementById('main-menu');
+        const newGameBtn = document.getElementById('new-game-btn');
+        const continueGameBtn = document.getElementById('continue-game-btn');
+        const deleteSaveBtn = document.getElementById('delete-save-btn');
+        
+        // Dimensões do canvas
+        let canvasWidth, canvasHeight;
+        
+        // Posição do braço
+        let armPosition = { x: 0, y: 0, z: 0 };
+        
+        // Posição do mouse
+        let mouseX = 0;
+        let mouseY = 0;
+        
+        // Controles
+        const keyMap = {
+            forward: false,
+            backward: false,
+            left: false,
+            right: false,
+            up: false,
+            down: false,
+            shoot: false,
+            cooldown: false
+        };
+        
+        // Inimigos
+        let enemies = [];
+        
+        // Projéteis
+        let projectiles = [];
+        
+        // Sons
+        const sounds = {
+            shoot: null,
+            enemyHit: null,
+            levelUp: null,
+            weaponUpgrade: null,
+            background: null
+        };
+        
+        // Recursos do jogo
+        const resources = {
+            images: {},
+            sounds: {},
+            total: 10, // Total de recursos a serem carregados
+            loaded: 0
+        };
+        
+        // Timers e IDs de animação
+        let gameLoopId = null;
+        let enemySpawnerId = null;
+        let lastTime = 0;
+        
+        // Inicialização do jogo
+        function initGame() {
+            // Configurar o tamanho do canvas
+            resizeCanvas();
+            
+            // Inicializar sons
+            initSounds();
+            
+            // Configurar eventos
+            setupEventListeners();
+            
+            // Carregar recursos com tratamento de erros
+            loadResources()
+                .then(() => {
+                    // Iniciar spawner de inimigos apenas após recursos carregados
+                    startEnemySpawner();
+                })
+                .catch(error => {
+                    console.error('Erro ao carregar recursos:', error);
+                    showMessage('Alguns recursos não puderam ser carregados. O jogo pode não funcionar corretamente.');
+                    // Tentar iniciar o jogo mesmo com erros
+                    startEnemySpawner();
+                });
+        }
+        
+        // Função para carregar recursos do jogo
+        function loadResources() {
+            return new Promise((resolve, reject) => {
+                try {
+                    // Simular carregamento de recursos
+                    let loadedCount = 0;
+                    const totalResources = 10;
+                    
+                    // Atualizar barra de progresso
+                    function updateProgress() {
+                        loadedCount++;
+                        const progress = (loadedCount / totalResources) * 100;
+                        progressBar.style.width = `${progress}%`;
+                        
+                        if (loadedCount >= totalResources) {
+                            // Recursos carregados, esconder tela de carregamento
+                            setTimeout(() => {
+                                loadingScreen.style.display = 'none';
+                                mainMenu.style.display = 'flex';
+                                resolve(); // Resolver a Promise quando todos os recursos forem carregados
+                            }, 500);
+                        }
+                    }
+                    
+                    // Simular carregamento de cada recurso
+                    for (let i = 0; i < totalResources; i++) {
+                        setTimeout(updateProgress, 200 * i);
+                    }
+                } catch (error) {
+                    reject(error); // Rejeitar a Promise em caso de erro
+                }
+            });
+        }
+        
+        function initSounds() {
+            sounds.shoot = new Audio('data:audio/wav;base64,UklGRl9vAAAKAAAAIAAAAQAAAQABAB8AAACQbXBsYWIAAAASAAAAAAAAAAAAAAAAAAAAAAAA');
+            sounds.enemyHit = new Audio('data:audio/wav;base64,UklGRl9vAAAKAAAAIAAAAQAAAQABAB8AAACQbXBsYWIAAAASAAAAAAAAAAAAAAAAAAAAAAAA');
+            sounds.levelUp = new Audio('data:audio/wav;base64,UklGRl9vAAAKAAAAIAAAAQAAAQABAB8AAACQbXBsYWIAAAASAAAAAAAAAAAAAAAAAAAAAAAA');
+            sounds.weaponUpgrade = new Audio('data:audio/wav;base64,UklGRl9vAAAKAAAAIAAAAQAAAQABAB8AAACQbXBsYWIAAAASAAAAAAAAAAAAAAAAAAAAAAAA');
+            sounds.background = new Audio('data:audio/wav;base64,UklGRl9vAAAKAAAAIAAAAQAAAQABAB8AAACQbXBsYWIAAAASAAAAAAAAAAAAAAAAAAAAAAAA');
+            
+            // Configurar volume
+            Object.values(sounds).forEach(sound => {
+                if (sound) {
+                    sound.volume = 0.3;
+                }
+            });
+        }
+        
+        // Loop principal do jogo
+        function gameLoop(timestamp) {
+            // Calcular delta time para movimento suave
+            const deltaTime = timestamp - lastTime;
+            lastTime = timestamp;
+            
+            // Atualizar posição do braço com base nos controles
+            if (keyMap.forward) armPosition.y -= gameConfig.armSpeed * (deltaTime / 16);
+            if (keyMap.backward) armPosition.y += gameConfig.armSpeed * (deltaTime / 16);
+            if (keyMap.left) armPosition.x -= gameConfig.armSpeed * (deltaTime / 16);
+            if (keyMap.right) armPosition.x += gameConfig.armSpeed * (deltaTime / 16);
+            if (keyMap.up) armPosition.z += gameConfig.armSpeed * (deltaTime / 16);
+            if (keyMap.down) armPosition.z -= gameConfig.armSpeed * (deltaTime / 16);
+            
+            // Limitar posição do braço dentro da tela
+            armPosition.x = Math.max(0, Math.min(canvasWidth, armPosition.x));
+            armPosition.y = Math.max(0, Math.min(canvasHeight, armPosition.y));
+            armPosition.z = Math.max(0, Math.min(1000, armPosition.z));
+            
+            // Verificar se deve atirar
+            if (keyMap.shoot) {
+                shootProjectile();
+            }
+            
+            // Atualizar posição visual do braço
+            updateArmPosition();
+            
+            // Atualizar projéteis
+            for (const projectile of projectiles) {
+                // Mover projétil na direção do ângulo
+                projectile.x += Math.cos(projectile.angle) * projectile.speed * (deltaTime / 16);
+                projectile.y += Math.sin(projectile.angle) * projectile.speed * (deltaTime / 16);
+                
+                // Atualizar posição visual
+                updateProjectilePosition(projectile);
+            }
+            
+            // Atualizar inimigos
+            for (const enemy of enemies) {
+                // Calcular direção para o braço
+                const dx = armPosition.x - enemy.x;
+                const dy = armPosition.y - enemy.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                // Normalizar e aplicar velocidade
+                if (distance > 0) {
+                    enemy.x += (dx / distance) * enemy.speed * (deltaTime / 16);
+                    enemy.y += (dy / distance) * enemy.speed * (deltaTime / 16);
+                }
+                
+                // Atualizar posição visual
+                updateEnemyPosition(enemy);
+            }
+            
+            // Verificar colisões
+            checkCollisions();
+            
+            // Continuar o loop se o jogo estiver rodando
+            if (gameConfig.isGameRunning) {
+                gameLoopId = requestAnimationFrame(gameLoop);
+            }
+        }
+        
+        // Iniciar o jogo automaticamente quando a página carregar
+        window.addEventListener('load', initGame);
+        
+        // Redimensionar o canvas
+        function resizeCanvas() {
+            canvasWidth = window.innerWidth;
+            canvasHeight = window.innerHeight;
+            gameCanvas.width = canvasWidth;
+            gameCanvas.height = canvasHeight;
+            
+            // Centralizar o braço inicialmente
+            armPosition.x = canvasWidth / 2;
+            armPosition.y = canvasHeight / 2;
+            updateArmPosition();
+        }
+        
+        // Criar inimigo
+        function createEnemy() {
+            // Posição aleatória fora da tela
+            let x, y;
+            const side = Math.floor(Math.random() * 4); // 0: top, 1: right, 2: bottom, 3: left
+            
+            switch (side) {
+                case 0: // top
+                    x = Math.random() * canvasWidth;
+                    y = -50;
+                    break;
+                case 1: // right
+                    x = canvasWidth + 50;
+                    y = Math.random() * canvasHeight;
+                    break;
+                case 2: // bottom
+                    x = Math.random() * canvasWidth;
+                    y = canvasHeight + 50;
+                    break;
+                case 3: // left
+                    x = -50;
+                    y = Math.random() * canvasHeight;
+                    break;
+            }
+            
+            // Criar elemento do inimigo
+            const enemyElement = document.createElement('div');
+            enemyElement.className = 'enemy';
+            document.getElementById('ui-overlay').appendChild(enemyElement);
+            
+            // Criar objeto do inimigo
+            const enemy = {
+                element: enemyElement,
+                x: x,
+                y: y,
+                speed: gameConfig.enemySpeed,
+                health: 1
+            };
+            
+            // Adicionar à lista de inimigos
+            enemies.push(enemy);
+            
+            // Atualizar posição visual
+            updateEnemyPosition(enemy);
+        }
+        
+        // Atualizar posição visual do inimigo
+        function updateEnemyPosition(enemy) {
+            enemy.element.style.left = `${enemy.x}px`;
+            enemy.element.style.top = `${enemy.y}px`;
+        }
+        
+        // Iniciar spawner de inimigos
+        function startEnemySpawner() {
+            enemySpawnerId = setInterval(createEnemy, gameConfig.enemySpawnRate);
+        }
+        
+        // Atirar projétil
+        function shootProjectile() {
+            if (keyMap.cooldown) return;
+            
+            // Criar elemento do projétil
+            const projectileElement = document.createElement('div');
+            projectileElement.className = 'projectile';
+            document.getElementById('ui-overlay').appendChild(projectileElement);
+            
+            // Calcular ângulo para o mouse
+            const dx = mouseX - armPosition.x;
+            const dy = mouseY - armPosition.y;
+            const angle = Math.atan2(dy, dx);
+            
+            // Criar objeto do projétil
+            const projectile = {
+                element: projectileElement,
+                x: armPosition.x,
+                y: armPosition.y,
+                angle: angle,
+                speed: gameConfig.projectileSpeed,
+                power: gameConfig.weaponLevel
+            };
+            
+            // Adicionar à lista de projéteis
+            projectiles.push(projectile);
+            
+            // Atualizar posição visual
+            updateProjectilePosition(projectile);
+            
+            // Tocar som
+            sounds.shoot.currentTime = 0;
+            sounds.shoot.play();
+            
+            // Cooldown
+            keyMap.cooldown = true;
+            setTimeout(() => {
+                keyMap.cooldown = false;
+            }, 200);
+        }
+        
+        // Atualizar posição visual do projétil
+        function updateProjectilePosition(projectile) {
+            projectile.element.style.left = `${projectile.x}px`;
+            projectile.element.style.top = `${projectile.y}px`;
+        }
+        
+        // Atualizar posição visual do braço
+        function updateArmPosition() {
+            arm.style.left = `${armPosition.x}px`;
+            arm.style.top = `${armPosition.y}px`;
+            
+            // Efeito de profundidade baseado em Z
+            const scale = 0.5 + (armPosition.z / 1000) * 0.5;
+            arm.style.transform = `translate(-50%, -50%) scale(${scale})`;
+        }
+        
+        // Verificar colisões
+        function checkCollisions() {
+            // Projéteis vs Inimigos
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                const projectile = projectiles[i];
+                
+                // Remover projéteis fora da tela
+                if (
+                    projectile.x < -50 ||
+                    projectile.x > canvasWidth + 50 ||
+                    projectile.y < -50 ||
+                    projectile.y > canvasHeight + 50
+                ) {
+                    projectile.element.remove();
+                    projectiles.splice(i, 1);
+                    continue;
+                }
+                
+                // Verificar colisão com inimigos
+                for (let j = enemies.length - 1; j >= 0; j--) {
+                    const enemy = enemies[j];
+                    const dx = projectile.x - enemy.x;
+                    const dy = projectile.y - enemy.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < 30) { // Raio de colisão
+                        // Dano ao inimigo
+                        enemy.health -= projectile.power;
+                        
+                        // Remover projétil
+                        projectile.element.remove();
+                        projectiles.splice(i, 1);
+                        
+                        // Tocar som
+                        sounds.enemyHit.currentTime = 0;
+                        sounds.enemyHit.play();
+                        
+                        // Verificar se o inimigo morreu
+                        if (enemy.health <= 0) {
+                            // Criar explosão
+                            createExplosion(enemy.x, enemy.y);
+                            
+                            // Remover inimigo
+                            enemy.element.remove();
+                            enemies.splice(j, 1);
+                            
+                            // Aumentar pontuação
+                            gameConfig.score += 10;
+                            updateScore();
+                            
+                            // Verificar level up
+                            checkLevelUp();
+                        }
+                        
+                        break;
+                    }
+                }
+            }
+            
+            // Inimigos vs Braço
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const enemy = enemies[i];
+                const dx = armPosition.x - enemy.x;
+                const dy = armPosition.y - enemy.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < 40) { // Raio de colisão
+                    // Game over
+                    gameOver();
+                    break;
+                }
+            }
+        }
+        
+        // Criar explosão
+        function createExplosion(x, y) {
+            const explosionElement = document.createElement('div');
+            explosionElement.className = 'explosion';
+            explosionElement.style.left = `${x}px`;
+            explosionElement.style.top = `${y}px`;
+            explosionElement.style.animation = 'pulse 0.5s forwards';
+            document.getElementById('ui-overlay').appendChild(explosionElement);
+            
+            // Remover após a animação
+            setTimeout(() => {
+                explosionElement.remove();
+            }, 500);
+        }
+        
+        // Atualizar pontuação
+        function updateScore() {
+            scoreElement.textContent = `Score: ${gameConfig.score}`;
+        }
+        
+        // Verificar level up
+        function checkLevelUp() {
+            const newLevel = Math.floor(gameConfig.score / 100) + 1;
+            
+            if (newLevel > gameConfig.level) {
+                gameConfig.level = newLevel;
+                levelElement.textContent = `Level: ${gameConfig.level}`;
+                
+                // Atualizar tema
+                const theme = gameConfig.levelThemes[gameConfig.level] || gameConfig.levelThemes[1];
+                themeElement.textContent = `Tema: ${theme.charAt(0).toUpperCase() + theme.slice(1)}`;
+                
+                // Aumentar dificuldade
+                gameConfig.enemySpeed += 0.2;
+                gameConfig.enemySpawnRate = Math.max(500, gameConfig.enemySpawnRate - 200);
+                
+                // Reiniciar spawner com nova taxa
+                clearInterval(enemySpawnerId);
+                startEnemySpawner();
+                
+                // Mensagem
+                showMessage(`Level Up! Agora você está no nível ${gameConfig.level}`);
+                
+                // Som
+                sounds.levelUp.currentTime = 0;
+                sounds.levelUp.play();
+                
+                // Chance de upgrade de arma
+                if (Math.random() < 0.5 && gameConfig.weaponLevel < gameConfig.maxWeaponLevel) {
+                    upgradeWeapon();
+                }
+            }
+        }
+        
+        // Upgrade de arma
+        function upgradeWeapon() {
+            gameConfig.weaponLevel++;
+            weaponLevelElement.textContent = `Arma: Nível ${gameConfig.weaponLevel}`;
+            
+            // Mensagem
+            showMessage(`Arma melhorada para o nível ${gameConfig.weaponLevel}!`);
+            
+            // Som
+            sounds.weaponUpgrade.currentTime = 0;
+            sounds.weaponUpgrade.play();
+        }
+        
+        // Mostrar mensagem
+        function showMessage(text) {
+            messageBox.textContent = text;
+            messageBox.style.opacity = 1;
+            
+            // Esconder após alguns segundos
+            setTimeout(() => {
+                messageBox.style.opacity = 0;
+            }, 3000);
+        }
+        
+        // Game over
+        function gameOver() {
+            gameConfig.isGameRunning = false;
+            
+            // Parar spawner
+            clearInterval(enemySpawnerId);
+            
+            // Salvar pontuação
+            SaveSystem.save('highScore', gameConfig.score);
+            
+            // Mostrar menu
+            mainMenu.style.display = 'flex';
+            
+            // Mensagem
+            showMessage(`Game Over! Pontuação: ${gameConfig.score}`);
+        }
+        
+        // Configurar event listeners
+        function setupEventListeners() {
+            // Teclado
+            window.addEventListener('keydown', (e) => {
+                switch (e.key.toLowerCase()) {
+                    case 'w': keyMap.forward = true; break;
+                    case 's': keyMap.backward = true; break;
+                    case 'a': keyMap.left = true; break;
+                    case 'd': keyMap.right = true; break;
+                    case 'q': keyMap.up = true; break;
+                    case 'e': keyMap.down = true; break;
+                    case ' ': keyMap.shoot = true; break;
+                }
+            });
+            
+            window.addEventListener('keyup', (e) => {
+                switch (e.key.toLowerCase()) {
+                    case 'w': keyMap.forward = false; break;
+                    case 's': keyMap.backward = false; break;
+                    case 'a': keyMap.left = false; break;
+                    case 'd': keyMap.right = false; break;
+                    case 'q': keyMap.up = false; break;
+                    case 'e': keyMap.down = false; break;
+                    case ' ': keyMap.shoot = false; break;
+                }
+            });
+            
+            // Mouse
+            window.addEventListener('mousemove', (e) => {
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+            });
+            
+            // Redimensionamento da janela
+            window.addEventListener('resize', resizeCanvas);
+            
+            // Botões do menu
+            newGameBtn.addEventListener('click', startNewGame);
+            continueGameBtn.addEventListener('click', continueGame);
+            deleteSaveBtn.addEventListener('click', deleteSave);
+            
+            // Verificar save existente
+            checkSavedGame();
+        }
+        
+        // Verificar se há um jogo salvo
+        function checkSavedGame() {
+            const savedGame = SaveSystem.load('spaceArmGame');
+            if (savedGame) {
+                continueGameBtn.disabled = false;
+                deleteSaveBtn.disabled = false;
+            } else {
+                continueGameBtn.disabled = true;
+                deleteSaveBtn.disabled = true;
+            }
+        }
+        
+        // Iniciar novo jogo
+        function startNewGame() {
+            // Resetar configurações
+            gameConfig.level = 1;
+            gameConfig.weaponLevel = 1;
+            gameConfig.score = 0;
+            gameConfig.isGameRunning = true;
+            gameConfig.enemySpeed = 1.5;
+            gameConfig.enemySpawnRate = 2000;
+            
+            // Atualizar UI
+            updateScore();
+            levelElement.textContent = `Level: ${gameConfig.level}`;
+            weaponLevelElement.textContent = `Arma: Nível ${gameConfig.weaponLevel}`;
+            
+            // Limpar inimigos e projéteis
+            clearEntities();
+            
+            // Esconder menu
+            mainMenu.style.display = 'none';
+            
+            // Iniciar spawner
+            startEnemySpawner();
+            
+            // Iniciar loop do jogo
+            lastTime = performance.now();
+            gameLoopId = requestAnimationFrame(gameLoop);
+        }
+        
+        // Continuar jogo salvo
+        function continueGame() {
+            const savedGame = SaveSystem.load('spaceArmGame');
+            if (!savedGame) return;
+            
+            // Carregar configurações
+            gameConfig.level = savedGame.level;
+            gameConfig.weaponLevel = savedGame.weaponLevel;
+            gameConfig.score = savedGame.score;
+            gameConfig.isGameRunning = true;
+            gameConfig.enemySpeed = savedGame.enemySpeed || 1.5;
+            gameConfig.enemySpawnRate = savedGame.enemySpawnRate || 2000;
+            
+            // Atualizar UI
+            updateScore();
+            levelElement.textContent = `Level: ${gameConfig.level}`;
+            weaponLevelElement.textContent = `Arma: Nível ${gameConfig.weaponLevel}`;
+            
+            // Atualizar tema
+            const theme = gameConfig.levelThemes[gameConfig.level] || gameConfig.levelThemes[1];
+            themeElement.textContent = `Tema: ${theme.charAt(0).toUpperCase() + theme.slice(1)}`;
+            
+            // Limpar inimigos e projéteis
+            clearEntities();
+            
+            // Esconder menu
+            mainMenu.style.display = 'none';
+            loadingScreen.style.display = 'none';
+            
+            // Iniciar spawner
+            startEnemySpawner();
+            
+            // Iniciar loop do jogo
+            lastTime = performance.now();
+            gameLoopId = requestAnimationFrame(gameLoop);
+        }
+        
+        // Deletar save
+        function deleteSave() {
+            SaveSystem.delete('spaceArmGame');
+            continueGameBtn.disabled = true;
+            deleteSaveBtn.disabled = true;
+            showMessage("Save deletado!");
+        }
+    </script>
+</body>
+</html>
