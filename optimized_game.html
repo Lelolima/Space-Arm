@@ -156,6 +156,51 @@
         .option-toggle label {
             margin-left: 10px;
         }
+
+        /* Reconstruído em 2026-11-22: estilos dos elementos criados pelo SpaceshipController/GameMenu */
+        #pause-menu {
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: rgba(0, 0, 20, 0.7);
+        }
+        .pause-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 30px;
+            background-color: #0a0a2a;
+            border: 2px solid #4080ff;
+            border-radius: 10px;
+            color: #e0e0ff;
+            text-align: center;
+        }
+        .pause-container button {
+            padding: 10px 20px;
+            background-color: #1a1a4a;
+            color: #e0e0ff;
+            border: 1px solid #4080ff;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .level-message, .upgrade-message {
+            position: fixed;
+            top: 35%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1500;
+            color: #4080ff;
+            text-shadow: 0 0 10px #4080ff;
+            text-align: center;
+            pointer-events: none;
+            transition: opacity 1s;
+        }
+        .fade-out {
+            opacity: 0;
+        }
     </style>
 </head>
 <body>

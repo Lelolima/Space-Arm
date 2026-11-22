@@ -570,6 +570,9 @@ class SpaceshipController {
         this.mapPosition.x = Math.max(0, Math.min(this.mapPosition.x, this.worldSize.width - this.gameCanvas.width));
         this.mapPosition.y = Math.max(0, Math.min(this.mapPosition.y, this.worldSize.height - this.gameCanvas.height));
         
+        // Fire active weapon (reconstruído)
+        this.handleFiring();
+        
         // Update projectiles
         this.updateProjectiles(deltaTime);
         
@@ -1425,9 +1428,6 @@ class SpaceshipController {
             // Add simple engine effect when thrusting
             if (this.spaceship.thrusting) {
                 this.ctx.beginPath();
-                this.
-        
-        // Weapon switch button
                 this.ctx.moveTo(-this.spaceship.width/2, 0);
                 this.ctx.lineTo(-this.spaceship.width/2 - 20, 10);
                 this.ctx.lineTo(-this.spaceship.width/2 - 20, -10);
@@ -1436,3 +1436,123 @@ class SpaceshipController {
                 this.ctx.fill();
             }
         } // End of renderSpaceship if-else block
+        
+        this.ctx.restore();
+    }
+    
+    // ===== Reconstruído em 2026-11-22 (o arquivo original estava truncado) =====
+    
+    drawBackground() {
+        if (this.backgroundImage && this.backgroundImage.complete && this.backgroundImage.width > 0) {
+            this.ctx.drawImage(this.backgroundImage, 0, 0, this.gameCanvas.width, this.gameCanvas.height);
+        } else {
+            this.ctx.fillStyle = '#050a1c';
+            this.ctx.fillRect(0, 0, this.gameCanvas.width, this.gameCanvas.height);
+        }
+    }
+    
+    handleFiring() {
+        if (!this.keys.fire || this.spaceship.weapons.length === 0) return;
+        const weapon = this.spaceship.weapons[this.activeWeaponIndex || 0];
+        const projectile = weapon.fire();
+        if (projectile) this.projectiles.push(projectile);
+    }
+    
+    renderTargetingReticle() {
+        const enemy = this.targetedEnemy;
+        const x = enemy.x - this.mapPosition.x;
+        const y = enemy.y - this.mapPosition.y;
+        const r = Math.max(enemy.width, enemy.height) * 0.75;
+        this.ctx.save();
+        this.ctx.strokeStyle = '#ff4444';
+        this.ctx.lineWidth = 2;
+        this.ctx.beginPath();
+        this.ctx.arc(x, y, r, 0, Math.PI * 2);
+        this.ctx.moveTo(x - r - 8, y); this.ctx.lineTo(x - r + 8, y);
+        this.ctx.moveTo(x + r - 8, y); this.ctx.lineTo(x + r + 8, y);
+        this.ctx.moveTo(x, y - r - 8); this.ctx.lineTo(x, y - r + 8);
+        this.ctx.moveTo(x, y + r - 8); this.ctx.lineTo(x, y + r + 8);
+        this.ctx.stroke();
+        this.ctx.restore();
+    }
+    
+    renderHUD() {
+        // Atualiza os elementos de HUD que existirem na página
+        const set = (id, text) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = text;
+        };
+        const weapon = this.spaceship.weapons[this.activeWeaponIndex || 0];
+        set('score', `Score: ${this.spaceship.score}`);
+        set('level', `Level: ${this.currentLevel}`);
+        set('shield', `Shield: ${Math.max(0, Math.round(this.spaceship.shield / this.spaceship.maxShield * 100))}%`);
+        if (weapon) set('weapon', `Weapon: ${weapon.name}`);
+    }
+    
+    updateMinimap() {
+        const ctx = this.mapCtx;
+        const w = this.mapCanvas.width;
+        const h = this.mapCanvas.height;
+        const sx = w / this.worldSize.width;
+        const sy = h / this.worldSize.height;
+        ctx.fillStyle = 'rgba(0, 10, 30, 0.7)';
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = '#ff4040';
+        this.enemies.forEach(e => ctx.fillRect(e.x * sx - 2, e.y * sy - 2, 4, 4));
+        ctx.fillStyle = '#4080ff';
+        ctx.fillRect(this.spaceship.x * sx - 3, this.spaceship.y * sy - 3, 6, 6);
+        ctx.strokeStyle = '#ffffff';
+        ctx.strokeRect(this.mapPosition.x * sx, this.mapPosition.y * sy, this.gameCanvas.width * sx, this.gameCanvas.height * sy);
+    }
+    
+    gameLoop() {
+        // No modo otimizado, quem conduz o loop é o OptimizedGameLauncher
+        if (this.settings.optimized) return;
+        if (this.gameState !== 'playing') return;
+        const now = Date.now();
+        const deltaTime = now - this.lastTime;
+        this.lastTime = now;
+        this.update(deltaTime);
+        this.render();
+        requestAnimationFrame(() => this.gameLoop());
+    }
+}
+
+// Armas usadas pelo SpaceshipController (assinatura igual à de HomingWeapon em space_arm_movement.js)
+class StandardWeapon {
+    constructor(spaceship, damage, speed, range, cooldownMs = 250) {
+        this.spaceship = spaceship;
+        this.damage = damage;
+        this.speed = speed;
+        this.range = range;
+        this.cooldownMs = cooldownMs;
+        this.lastFired = 0;
+        this.name = 'Standard Laser';
+        this.homing = false;
+    }
+    
+    fire() {
+        const now = Date.now();
+        if (now - this.lastFired < this.cooldownMs) return null;
+        this.lastFired = now;
+        return {
+            x: this.spaceship.x,
+            y: this.spaceship.y,
+            angle: this.spaceship.angle,
+            speed: this.speed,
+            damage: this.damage,
+            range: this.range,
+            distanceTraveled: 0,
+            homing: this.homing,
+            isPlayerProjectile: true
+        };
+    }
+}
+
+class HomingWeapon extends StandardWeapon {
+    constructor(spaceship, damage, speed, range) {
+        super(spaceship, damage, speed, range, 500);
+        this.name = 'Homing Missile';
+        this.homing = true;
+    }
+}
