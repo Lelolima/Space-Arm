@@ -1,0 +1,12 @@
+{
+  "name": "space-arm",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Jogo de navegador Space Arm (HTML5/Canvas, sem build)",
+  "scripts": {
+    "test": "node --test tests/smoke.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
