@@ -323,4 +323,30 @@ class ImprovedTargetingSystem {
         }
         
         // Update lock status
-        const lockStatus = this.targetingRe
+// [Linhas abaixo vindas de improved_targeting_system_part2.js, reconstruído 2026-11-22]
+        const lockStatus = this.targetingReticle.querySelector('.lock-status');
+        if (lockStatus) {
+            const lockTimeRemaining = Math.max(0, this.targetLockDuration - (Date.now() - this.targetLockTime));
+            const lockPercentage = Math.floor((lockTimeRemaining / this.targetLockDuration) * 100);
+            lockStatus.textContent = `ALVO BLOQUEADO ${lockPercentage}%`;
+    
+            // Visual effect based on lock time
+            const pulseRate = 0.5 + (lockPercentage / 200); // Pulse faster as lock weakens
+            this.targetingReticle.style.animation = `pulse ${pulseRate}s infinite`;
+        }
+
+        // Add a CSS animation if it doesn't exist yet
+        if (!document.getElementById('targeting-animations')) {
+            const styleSheet = document.createElement('style');
+            styleSheet.id = 'targeting-animations';
+            styleSheet.textContent = `
+                @keyframes pulse {
+                    0% { transform: translate(-50%, -50%) scale(1); opacity: 0.9; }
+                    50% { transform: translate(-50%, -50%) scale(1.05); opacity: 1; }
+                    100% { transform: translate(-50%, -50%) scale(1); opacity: 0.9; }
+                }
+            `;
+            document.head.appendChild(styleSheet);
+        }
+    }
+}
