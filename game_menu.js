@@ -375,3 +375,29 @@ class GameMenu {
         // Store reference to game controller
         window.gameController = controller;
     }
+    
+    // ===== Reconstruído em 2026-11-22 (o arquivo original estava truncado) =====
+    
+    clearScreen() {
+        if (this.currentScreen && this.currentScreen.parentNode) {
+            this.currentScreen.parentNode.removeChild(this.currentScreen);
+        }
+        this.currentScreen = null;
+    }
+    
+    createAnimatedBackground() {
+        // Fundo estrelado simples atrás do menu (uma única vez)
+        if (document.getElementById('menu-background')) return;
+        const bg = document.createElement('div');
+        bg.id = 'menu-background';
+        bg.style.cssText = 'position:fixed;inset:0;z-index:-1;pointer-events:none;' +
+            'background:radial-gradient(ellipse at center,#0a1030 0%,#000 100%);';
+        this.parentElement.appendChild(bg);
+    }
+    
+    pauseGame() {
+        if (this.gameController) {
+            this.gameController.togglePause();
+        }
+    }
+}

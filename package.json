@@ -4,9 +4,13 @@
   "version": "0.0.0",
   "description": "Jogo de navegador Space Arm (HTML5/Canvas, sem build)",
   "scripts": {
-    "test": "node --test tests/smoke.test.js"
+    "test": "node --test tests/smoke.test.js",
+    "test:browser": "node --test --test-concurrency=1 tests/browser.test.mjs"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^25.18.1"
   }
 }

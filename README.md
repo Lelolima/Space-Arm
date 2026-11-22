@@ -4,7 +4,7 @@ Space Arm é um jogo de ação no navegador onde você controla um braço mecân
 
 ## Como jogar
 
-Abra `space_arm.html` no navegador (duplo clique ou `file://`). Não há instalação.
+Abra `space_arm.html` (ou qualquer página da tabela abaixo) no navegador (duplo clique ou `file://`). Não há instalação para jogar; `npm ci` só é necessário para rodar os testes.
 
 Opcional, para servir via HTTP: `python -m http.server 8000` e acesse http://localhost:8000/space_arm.html.
 
@@ -18,7 +18,7 @@ Os controles das outras variantes podem diferir; veja o código de cada página.
 
 ## Páginas
 
-Estado verificado na auditoria de 2026-11-22 (carregamento em Chrome headless, sem erros de JavaScript, e testes de sintaxe):
+Estado verificado em 2026-11-22 com testes em Chrome headless (carregamento sem erros de JavaScript/console e interações principais):
 
 | Página | Estado |
 |--------|--------|
@@ -27,11 +27,17 @@ Estado verificado na auditoria de 2026-11-22 (carregamento em Chrome headless, s
 | `space_arm_improved.html` | Funciona |
 | `space_arm_movement.html` | Funciona |
 | `space_combat_simulator.html` | Funciona |
-| `optimized_game.html` | **Quebrada**: `optimized_game_launcher.js` e `space_arm_movement_enhanced.js` estão truncados |
-| `space_combat_enhanced.html` | **Quebrada**: `game_menu.js`, `improved_targeting_system*.js` e `space_combat_enhanced.js` estão truncados |
-| `space_arm_3d.html` | **Quebrada**: arquivo truncado no meio de um `<script>` |
+| `optimized_game.html` | Funciona; partes **reconstruídas** em 2026-11-22 |
+| `space_combat_enhanced.html` | Funciona; partes **reconstruídas** em 2026-11-22 |
+| `space_arm_3d.html` | Funciona; lógica do jogo **reconstruída** em 2026-11-22 |
 
-Os arquivos truncados chegaram assim no commit original; o código que falta não existe no histórico e não foi reinventado.
+Seis arquivos JS e três páginas chegaram truncados no commit original. Não havia versões completas no histórico git, então o que faltava foi reconstruído com a implementação mais simples compatível com o HTML, o CSS e o código existente (detalhes, arquivo por arquivo, em `docs/auditoria/AUDITORIA-2026-11-22.md`). O comportamento dessas partes pode diferir do que o autor pretendia originalmente.
+
+### Controles de `space_combat_enhanced.html`
+W/A/S/D ou setas: mover · ESPAÇO: atirar · Q: trocar arma · E: liga/desliga mira automática · T: sistema de mira · P: predição de movimento · ESC: pausa
+
+### Controles de `space_arm_3d.html`
+W/A/S/D: mover · Q/E: subir/descer · SHIFT: impulso · ESPAÇO: atirar · TAB: trocar arma
 
 ## Recursos (nas páginas que funcionam)
 - Níveis progressivos e temas visuais
@@ -46,10 +52,12 @@ Os arquivos truncados chegaram assim no commit original; o código que falta nã
 ## Testes
 
 ```bash
-npm test   # Node 20+; sem dependências
+npm ci
+npm test               # testes estáticos (sintaxe, integridade das páginas, SaveSystem); Node 20+
+npm run test:browser   # Chrome headless: carrega as 8 páginas e exercita as interações das 3 reconstruídas
 ```
 
-Validam a sintaxe de todos os scripts íntegros, a integridade das páginas jogáveis (tags fechadas, scripts referenciados existem e compilam), o comportamento do `SaveSystem` e mantêm a lista de arquivos truncados explícita. O CI (`.github/workflows/ci.yml`) roda isso a cada push/PR.
+`test:browser` usa o Chrome instalado na máquina (puppeteer-core, não baixa navegador); defina `CHROME_PATH` se ele não for encontrado. O CI (`.github/workflows/ci.yml`) roda os dois a cada push/PR.
 
 ## Variáveis de ambiente
 

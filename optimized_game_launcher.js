@@ -387,3 +387,54 @@ class OptimizedGameLauncher {
                 if (distance > lowDetailDistance) {
                     // Low detail rendering
                     ctx.fillStyle = '#aaaaaa';
+                    // ===== Reconstruído em 2026-11-22 (o arquivo original estava truncado) =====
+                    ctx.beginPath();
+                    ctx.arc(dx + player.x - this.gameController.mapPosition.x,
+                            dy + player.y - this.gameController.mapPosition.y,
+                            asteroid.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    // High detail rendering: rotated irregular polygon with outline
+                    const sx = asteroid.x - this.gameController.mapPosition.x;
+                    const sy = asteroid.y - this.gameController.mapPosition.y;
+                    ctx.save();
+                    ctx.translate(sx, sy);
+                    ctx.rotate(asteroid.rotation);
+                    ctx.beginPath();
+                    const points = 8;
+                    for (let p = 0; p < points; p++) {
+                        const a = (p / points) * Math.PI * 2;
+                        const r = asteroid.radius * (p % 2 === 0 ? 1 : 0.85);
+                        if (p === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+                        else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+                    }
+                    ctx.closePath();
+                    ctx.fillStyle = '#888888';
+                    ctx.fill();
+                    ctx.strokeStyle = '#cccccc';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            }
+        }
+        
+        // Draw the remaining game layers using the controller's renderers
+        const gc = this.gameController;
+        gc.renderCelestialBodies();
+        gc.renderPowerUps();
+        gc.renderParticles();
+        gc.renderProjectiles();
+        gc.renderEnemies();
+        gc.renderSpaceship();
+        if (gc.spaceship.autoTargeting && gc.targetedEnemy) {
+            gc.renderTargetingReticle();
+        }
+        gc.renderHUD();
+        
+        // Minimap from the interactive map system
+        if (this.mapSystem) {
+            this.mapSystem.drawMinimap();
+        }
+    }
+}

@@ -322,6 +322,70 @@
             border-radius: 20px;
             border: 1px solid rgba(64, 128, 255, 0.7);
         }
+
+        /* Reconstruído em 2026-11-22: estilos dos elementos criados pelo SpaceshipController/GameMenu */
+        #pause-menu {
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: rgba(0, 0, 20, 0.7);
+        }
+        .pause-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 30px;
+            background-color: #0a0a2a;
+            border: 2px solid #4080ff;
+            border-radius: 10px;
+            color: #e0e0ff;
+            text-align: center;
+        }
+        .pause-container button {
+            padding: 10px 20px;
+            background-color: #1a1a4a;
+            color: #e0e0ff;
+            border: 1px solid #4080ff;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .level-message, .upgrade-message {
+            position: fixed;
+            top: 35%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1500;
+            color: #4080ff;
+            text-shadow: 0 0 10px #4080ff;
+            text-align: center;
+            pointer-events: none;
+            transition: opacity 1s;
+        }
+        .fade-out {
+            opacity: 0;
+        }
+        #game-info {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            z-index: 10;
+            color: #e0e0ff;
+            font-size: 0.9em;
+        }
+        #pause-button {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            z-index: 10;
+            transform: translateX(-50%);
+            background: transparent;
+            border: 1px solid #4080ff;
+            border-radius: 5px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -398,3 +462,39 @@
                     document.getElementById('main-menu').style.display = 'flex';
                 }, 500);
             }
+        }
+        
+        // ===== Reconstruído em 2026-11-22 (o arquivo original estava truncado) =====
+        let selectedDifficulty = 'normal';
+        
+        document.querySelectorAll('.difficulty-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.difficulty-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                selectedDifficulty = btn.dataset.difficulty;
+            });
+        });
+        
+        document.getElementById('instructions-btn').addEventListener('click', () => {
+            document.getElementById('main-menu').style.display = 'none';
+            document.getElementById('instructions-screen').style.display = 'flex';
+        });
+        
+        document.getElementById('back-to-menu-btn').addEventListener('click', () => {
+            document.getElementById('instructions-screen').style.display = 'none';
+            document.getElementById('main-menu').style.display = 'flex';
+        });
+        
+        document.getElementById('start-game-btn').addEventListener('click', () => {
+            document.getElementById('main-menu').style.display = 'none';
+            const menu = new GameMenu(document.body);
+            menu.gameSettings.difficulty = selectedDifficulty;
+            menu.saveSettings();
+            menu.initGame();
+            window.gameMenu = menu;
+        });
+        
+        updateLoadingBar();
+    </script>
+</body>
+</html>

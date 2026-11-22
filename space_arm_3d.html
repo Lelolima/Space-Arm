@@ -748,4 +748,522 @@
             warning: new Audio('data:audio/wav;base64,UklGRl9HAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAAABMSVNUHAAAAGluZm9JTkFNRQoAAABXYXJuaW5nICAgAFJJRkZHRwAAV0FWRWZtdCAQAAAAAQABAEAfAABAfwAAAQAIAABkYXRhA0cAAJOTlJWXmJqbnZ+goaKjpKWmp6ipqqusra6vsLGys7S1tre4ubq7vL2+v8DBwsPExcbHyMnKy8zNzs/Q0dLT1NXW19jZ2tvc3d7f4OHi4+Tl5ufo6err7O3u7/Dx8vP09fb3+Pn6+/z9/v8AAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8wMTIzNDU2Nzg5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZG'),
             warning: new Audio('data:audio/wav;base64,UklGRl9HAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAAABMSVNUHAAAAGluZm9JTkFNRQoAAABXYXJuaW5nICAgAFJJRkZHRwAAV0FWRWZtdCAQAAAAAQABAEAfAABAfwAAAQAIAABkYXRhA0cAAJOTlJWXmJqbnZ+goaKjpKWmp6ipqqusra6vsLGys7S1tre4ubq7vL2+v8DBwsPExcbHyMnKy8zNzs/Q0dLT1NXW19jZ2tvc3d7f4OHi4+Tl5ufo6err7O3u7/Dx8vP09fb3+Pn6+/z9/v8AAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8wMTIzNDU2Nzg5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZG')
         };
-        Model Request failed, please try again later.
+        // ===== Reconstruído em 2026-11-22: o arquivo original terminava aqui, truncado. =====
+        // Implementação mínima baseada em space_arm_improved.html e nos elementos/CSS desta página.
+
+        const SAVE_KEY = 'spaceArm3DGame';
+        const SETTINGS_KEY = 'spaceArm3DSettings';
+        const Storage = {
+            save(key, data) { try { localStorage.setItem(key, JSON.stringify(data)); return true; } catch (e) { return false; } },
+            load(key) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null; } catch (e) { return null; } },
+            remove(key) { try { localStorage.removeItem(key); } catch (e) { /* sem armazenamento */ } }
+        };
+
+        let lastTime = 0;
+        let gameLoopId = null;
+        let enemySpawnerId = null;
+        let gameStarted = false;
+        let lastShotTime = 0;
+        let shootPressedAt = 0;
+        let lastResponseTime = 0;
+        const radarBlips = [];
+
+        function playSound(sound) {
+            if (!sound) return;
+            try {
+                sound.volume = gameConfig.sound.volume;
+                sound.currentTime = 0;
+                const p = sound.play();
+                if (p && p.catch) p.catch(() => {});
+            } catch (e) { /* áudio indisponível */ }
+        }
+
+        function updateHudText() {
+            scoreElement.textContent = `Score: ${gameConfig.score}`;
+            levelElement.textContent = `Level: ${gameConfig.level}`;
+            weaponLevelElement.textContent = `Arma: Nível ${gameConfig.weaponLevel}`;
+            themeElement.textContent = `Tema: ${gameConfig.levelThemes[gameConfig.level] || gameConfig.levelThemes[1]}`;
+        }
+
+        function showMessage(text) {
+            messageBox.textContent = text;
+            messageBox.style.opacity = 1;
+            setTimeout(() => { messageBox.style.opacity = 0; }, 3000);
+        }
+
+        // ---------- Menus e save ----------
+        function checkSavedGame() {
+            const saved = Storage.load(SAVE_KEY);
+            continueGameBtn.disabled = !saved;
+            deleteSaveBtn.disabled = !saved;
+        }
+
+        function saveGame() {
+            Storage.save(SAVE_KEY, { level: gameConfig.level, weaponLevel: gameConfig.weaponLevel, score: gameConfig.score });
+        }
+
+        function applySettings() {
+            gameConfig.autoAim.level = parseInt(aimAssistLevelSelect.value, 10);
+            gameConfig.autoAim.enabled = gameConfig.autoAim.level > 0;
+            gameConfig.graphics.quality = graphicsQualitySelect.value;
+            gameConfig.graphics.particleCount = { low: 15, medium: 50, high: 100 }[gameConfig.graphics.quality] || 50;
+            gameConfig.graphics.celestialObjects = gameConfig.graphics.quality !== 'low';
+            gameConfig.sound.volume = parseInt(soundVolumeInput.value, 10) / 100;
+            aimAssistIndicator.textContent = gameConfig.autoAim.enabled ? 'Auto-Aim: Ativo' : 'Auto-Aim: Inativo';
+            Storage.save(SETTINGS_KEY, {
+                aimAssist: aimAssistLevelSelect.value,
+                quality: graphicsQualitySelect.value,
+                volume: soundVolumeInput.value
+            });
+        }
+
+        function loadSettings() {
+            const s = Storage.load(SETTINGS_KEY);
+            if (s) {
+                if (s.aimAssist !== undefined) aimAssistLevelSelect.value = s.aimAssist;
+                if (s.quality) graphicsQualitySelect.value = s.quality;
+                if (s.volume !== undefined) soundVolumeInput.value = s.volume;
+            }
+            applySettings();
+        }
+
+        function startGame(saved) {
+            gameConfig.level = saved ? saved.level : 1;
+            gameConfig.weaponLevel = saved ? saved.weaponLevel : 1;
+            gameConfig.score = saved ? saved.score : 0;
+            gameConfig.enemySpeed = 1.5 + (gameConfig.level - 1) * 0.5;
+            gameConfig.enemySpawnRate = Math.max(500, 2000 - (gameConfig.level - 1) * 200);
+            gameConfig.isGameRunning = true;
+            gameConfig.performance.shotsFired = 0;
+            gameConfig.performance.shotsHit = 0;
+            updateHudText();
+            clearEntities();
+            mainMenu.style.display = 'none';
+            settingsMenu.style.display = 'none';
+            resizeCanvas();
+            armVelocity = { x: 0, y: 0, z: 0 };
+            createCelestialObjects();
+            if (!gameStarted) {
+                setupGameInput();
+                gameStarted = true;
+            }
+            clearInterval(enemySpawnerId);
+            startEnemySpawner();
+            cancelAnimationFrame(gameLoopId);
+            lastTime = performance.now();
+            gameLoopId = requestAnimationFrame(gameLoop);
+        }
+
+        function clearEntities() {
+            enemies.forEach(e => e.element.remove());
+            projectiles.forEach(p => p.element.remove());
+            particles.forEach(p => p.element.remove());
+            celestialObjects.forEach(c => c.element.remove());
+            radarBlips.splice(0).forEach(b => b.remove());
+            enemies = []; projectiles = []; particles = []; celestialObjects = [];
+            currentTarget = null;
+            if (targetingReticle) { targetingReticle.remove(); targetingReticle = null; }
+        }
+
+        // ---------- Canvas e cenário ----------
+        function resizeCanvas() {
+            canvasWidth = window.innerWidth;
+            canvasHeight = window.innerHeight;
+            gameCanvas.width = canvasWidth;
+            gameCanvas.height = canvasHeight;
+            armPosition.x = canvasWidth / 2;
+            armPosition.y = canvasHeight / 2;
+            updateArmPosition();
+        }
+
+        function createCelestialObjects() {
+            if (!gameConfig.graphics.celestialObjects) return;
+            const overlay = document.getElementById('ui-overlay');
+            const specs = [['planet', 2, 80, 160], ['asteroid', 6, 15, 40], ['nebula', 2, 200, 320]];
+            for (const [type, count, min, max] of specs) {
+                for (let i = 0; i < count; i++) {
+                    const size = min + Math.random() * (max - min);
+                    const el = document.createElement('div');
+                    el.className = `celestial-object ${type}`;
+                    el.style.width = `${size}px`;
+                    el.style.height = `${size}px`;
+                    el.style.left = `${Math.random() * canvasWidth}px`;
+                    el.style.top = `${Math.random() * canvasHeight}px`;
+                    if (type === 'planet') el.style.background = `hsl(${Math.floor(Math.random() * 360)}, 50%, 45%)`;
+                    overlay.appendChild(el);
+                    celestialObjects.push({ type, element: el });
+                }
+            }
+        }
+
+        function drawBackground() {
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+        }
+
+        // ---------- Entrada ----------
+        function setupGameInput() {
+            const keys = { w: 'forward', s: 'backward', a: 'left', d: 'right', q: 'up', e: 'down', ' ': 'shoot', shift: 'boost' };
+            window.addEventListener('keydown', (ev) => {
+                const k = ev.key.toLowerCase();
+                if (k === 'tab') {
+                    ev.preventDefault();
+                    if (!keyMap.switchWeapon) switchWeapon();
+                    keyMap.switchWeapon = true;
+                    return;
+                }
+                if (keys[k]) {
+                    if (k === ' ') ev.preventDefault();
+                    if (keys[k] === 'shoot' && !keyMap.shoot) shootPressedAt = performance.now();
+                    keyMap[keys[k]] = true;
+                }
+            });
+            window.addEventListener('keyup', (ev) => {
+                const k = ev.key.toLowerCase();
+                if (k === 'tab') keyMap.switchWeapon = false;
+                if (keys[k]) keyMap[keys[k]] = false;
+            });
+            window.addEventListener('mousemove', (ev) => { mouseX = ev.clientX; mouseY = ev.clientY; });
+            window.addEventListener('resize', resizeCanvas);
+        }
+
+        function switchWeapon() {
+            currentWeaponIndex = (currentWeaponIndex + 1) % gameConfig.weapons.length;
+            showMessage(`Arma: ${gameConfig.weapons[currentWeaponIndex].name}`);
+        }
+
+        // ---------- Física do braço ----------
+        function updateArm(deltaTime) {
+            const f = deltaTime / 16;
+            const ph = gameConfig.physics;
+            const acc = ph.acceleration * (keyMap.boost ? ph.thrustPower : 1);
+            if (keyMap.forward) armVelocity.y -= acc * f;
+            if (keyMap.backward) armVelocity.y += acc * f;
+            if (keyMap.left) armVelocity.x -= acc * f;
+            if (keyMap.right) armVelocity.x += acc * f;
+            if (keyMap.up) armVelocity.z += acc * f;
+            if (keyMap.down) armVelocity.z -= acc * f;
+            const max = ph.maxVelocity * (keyMap.boost ? ph.thrustPower : 1);
+            const speed = Math.hypot(armVelocity.x, armVelocity.y);
+            if (speed > max) { armVelocity.x *= max / speed; armVelocity.y *= max / speed; }
+            armVelocity.z = Math.max(-max, Math.min(max, armVelocity.z));
+            armVelocity.x *= ph.inertia; armVelocity.y *= ph.inertia; armVelocity.z *= ph.inertia;
+            armPosition.x = Math.max(0, Math.min(canvasWidth, armPosition.x + armVelocity.x * f));
+            armPosition.y = Math.max(0, Math.min(canvasHeight, armPosition.y + armVelocity.y * f));
+            armPosition.z = Math.max(0, Math.min(1000, armPosition.z + armVelocity.z * f));
+            if (speed > 0.1) armRotation.yaw = Math.atan2(armVelocity.y, armVelocity.x);
+            velocityFill.style.width = `${Math.min(100, (speed / (ph.maxVelocity * ph.thrustPower)) * 100)}%`;
+            updateArmPosition();
+        }
+
+        function perspectiveScale() {
+            return Math.max(0.5, Math.min(1.5, 1 - armPosition.z / 1000));
+        }
+
+        function updateArmPosition() {
+            const size = 120 * perspectiveScale();
+            arm.style.left = `${armPosition.x}px`;
+            arm.style.top = `${armPosition.y}px`;
+            arm.style.width = `${size}px`;
+            arm.style.height = `${size}px`;
+            arm.style.transform = `translate(-50%, -50%) rotate(${armRotation.yaw}rad)`;
+        }
+
+        // ---------- Inimigos ----------
+        function startEnemySpawner() {
+            enemySpawnerId = setInterval(() => { if (gameConfig.isGameRunning) createEnemy(); }, gameConfig.enemySpawnRate);
+        }
+
+        function createEnemy() {
+            let x, y;
+            switch (Math.floor(Math.random() * 4)) {
+                case 0: x = Math.random() * canvasWidth; y = -50; break;
+                case 1: x = canvasWidth + 50; y = Math.random() * canvasHeight; break;
+                case 2: x = Math.random() * canvasWidth; y = canvasHeight + 50; break;
+                default: x = -50; y = Math.random() * canvasHeight;
+            }
+            const el = document.createElement('div');
+            el.className = 'enemy';
+            document.getElementById('ui-overlay').appendChild(el);
+            const blip = document.createElement('div');
+            blip.className = 'radar-blip';
+            radar.appendChild(blip);
+            radarBlips.push(blip);
+            const enemy = { x, y, vx: 0, vy: 0, health: 20 + gameConfig.level * 10,
+                speed: gameConfig.enemySpeed * (0.8 + Math.random() * 0.4), element: el, blip };
+            enemies.push(enemy);
+            updateEnemyVisual(enemy);
+        }
+
+        function removeEnemy(index) {
+            const enemy = enemies[index];
+            enemy.element.remove();
+            enemy.blip.remove();
+            const b = radarBlips.indexOf(enemy.blip);
+            if (b >= 0) radarBlips.splice(b, 1);
+            if (enemy === currentTarget) currentTarget = null;
+            enemies.splice(index, 1);
+        }
+
+        function updateEnemies(deltaTime) {
+            const f = deltaTime / 16;
+            for (const enemy of enemies) {
+                const dx = armPosition.x - enemy.x;
+                const dy = armPosition.y - enemy.y;
+                const d = Math.hypot(dx, dy);
+                enemy.vx = d > 0 ? (dx / d) * enemy.speed : 0;
+                enemy.vy = d > 0 ? (dy / d) * enemy.speed : 0;
+                enemy.x += enemy.vx * f;
+                enemy.y += enemy.vy * f;
+                updateEnemyVisual(enemy);
+            }
+        }
+
+        function updateEnemyVisual(enemy) {
+            const size = 50 * perspectiveScale();
+            enemy.element.style.left = `${enemy.x}px`;
+            enemy.element.style.top = `${enemy.y}px`;
+            enemy.element.style.width = `${size}px`;
+            enemy.element.style.height = `${size}px`;
+            // Radar: posição relativa ao braço, alcance de 600px
+            const r = radar.clientWidth / 2 || 60;
+            const rx = Math.max(-1, Math.min(1, (enemy.x - armPosition.x) / 600));
+            const ry = Math.max(-1, Math.min(1, (enemy.y - armPosition.y) / 600));
+            enemy.blip.style.left = `${r + rx * r}px`;
+            enemy.blip.style.top = `${r + ry * r}px`;
+        }
+
+        // ---------- Auto-aim ----------
+        function updateTargeting() {
+            currentTarget = null;
+            if (gameConfig.autoAim.enabled) {
+                let best = gameConfig.autoAim.range * (0.5 + gameConfig.autoAim.level * 0.25);
+                for (const enemy of enemies) {
+                    const d = Math.hypot(enemy.x - armPosition.x, enemy.y - armPosition.y);
+                    if (d < best) { best = d; currentTarget = enemy; }
+                }
+            }
+            if (currentTarget) {
+                if (!targetingReticle) {
+                    targetingReticle = document.createElement('div');
+                    targetingReticle.className = 'targeting-reticle';
+                    document.getElementById('hud-overlay').appendChild(targetingReticle);
+                }
+                targetingReticle.style.left = `${currentTarget.x}px`;
+                targetingReticle.style.top = `${currentTarget.y}px`;
+            } else if (targetingReticle) {
+                targetingReticle.remove();
+                targetingReticle = null;
+            }
+        }
+
+        function aimAngle(weapon) {
+            if (currentTarget) {
+                let tx = currentTarget.x, ty = currentTarget.y;
+                if (gameConfig.autoAim.level >= 3) {
+                    // Preditivo: mira onde o alvo estará quando o projétil chegar
+                    const t = Math.hypot(tx - armPosition.x, ty - armPosition.y) / weapon.speed;
+                    tx += currentTarget.vx * t; ty += currentTarget.vy * t;
+                }
+                return Math.atan2(ty - armPosition.y, tx - armPosition.x);
+            }
+            return Math.atan2(mouseY - armPosition.y, mouseX - armPosition.x);
+        }
+
+        // ---------- Projéteis ----------
+        function shootProjectile(now) {
+            const weapon = gameConfig.weapons[currentWeaponIndex];
+            const cooldown = weapon.cooldown / (1 + (gameConfig.weaponLevel - 1) * 0.25);
+            if (now - lastShotTime < cooldown) return;
+            lastShotTime = now;
+            if (shootPressedAt) { lastResponseTime = now - shootPressedAt; shootPressedAt = 0; }
+            const el = document.createElement('div');
+            el.className = 'projectile';
+            el.style.background = weapon.color;
+            el.style.width = el.style.height = `${weapon.size * 2}px`;
+            document.getElementById('ui-overlay').appendChild(el);
+            const p = { x: armPosition.x, y: armPosition.y, angle: aimAngle(weapon), speed: weapon.speed,
+                damage: weapon.damage * (1 + (gameConfig.weaponLevel - 1) * 0.2), homing: weapon.type === 'missile',
+                target: currentTarget, element: el };
+            projectiles.push(p);
+            gameConfig.performance.shotsFired++;
+            playSound(weapon.type === 'missile' ? sounds.missile : sounds.shoot);
+        }
+
+        function updateProjectiles(deltaTime) {
+            const f = deltaTime / 16;
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                const p = projectiles[i];
+                if (p.homing && p.target && enemies.includes(p.target)) {
+                    const want = Math.atan2(p.target.y - p.y, p.target.x - p.x);
+                    let diff = want - p.angle;
+                    while (diff > Math.PI) diff -= Math.PI * 2;
+                    while (diff < -Math.PI) diff += Math.PI * 2;
+                    p.angle += diff * 0.1;
+                }
+                p.x += Math.cos(p.angle) * p.speed * f;
+                p.y += Math.sin(p.angle) * p.speed * f;
+                if (p.x < -50 || p.x > canvasWidth + 50 || p.y < -50 || p.y > canvasHeight + 50) {
+                    p.element.remove();
+                    projectiles.splice(i, 1);
+                    continue;
+                }
+                p.element.style.left = `${p.x}px`;
+                p.element.style.top = `${p.y}px`;
+            }
+        }
+
+        // ---------- Partículas / explosões ----------
+        function createExplosion(x, y) {
+            const el = document.createElement('div');
+            el.className = 'explosion';
+            el.style.left = `${x}px`;
+            el.style.top = `${y}px`;
+            el.style.animation = 'explosion-pulse 0.5s forwards';
+            document.getElementById('ui-overlay').appendChild(el);
+            setTimeout(() => el.remove(), 500);
+            const n = Math.round(gameConfig.graphics.particleCount / 5);
+            for (let i = 0; i < n; i++) {
+                const pe = document.createElement('div');
+                pe.className = 'projectile';
+                pe.style.width = pe.style.height = '4px';
+                pe.style.background = '#ffaa00';
+                document.getElementById('ui-overlay').appendChild(pe);
+                const a = Math.random() * Math.PI * 2, s = 1 + Math.random() * 3;
+                particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 30, element: pe });
+            }
+            playSound(sounds.explosion);
+        }
+
+        function updateParticles(deltaTime) {
+            const f = deltaTime / 16;
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx * f; p.y += p.vy * f; p.life -= f;
+                if (p.life <= 0) { p.element.remove(); particles.splice(i, 1); continue; }
+                p.element.style.left = `${p.x}px`;
+                p.element.style.top = `${p.y}px`;
+                p.element.style.opacity = p.life / 30;
+            }
+        }
+
+        // ---------- Colisões e progressão ----------
+        function checkCollisions() {
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                const p = projectiles[i];
+                for (let j = enemies.length - 1; j >= 0; j--) {
+                    const e = enemies[j];
+                    if (Math.hypot(p.x - e.x, p.y - e.y) < 30) {
+                        p.element.remove();
+                        projectiles.splice(i, 1);
+                        gameConfig.performance.shotsHit++;
+                        e.health -= p.damage;
+                        playSound(sounds.enemyHit);
+                        if (e.health <= 0) {
+                            createExplosion(e.x, e.y);
+                            removeEnemy(j);
+                            addScore(10);
+                        }
+                        break;
+                    }
+                }
+            }
+            for (const e of enemies) {
+                if (Math.hypot(armPosition.x - e.x, armPosition.y - e.y) < 40) {
+                    gameOver();
+                    break;
+                }
+            }
+        }
+
+        function addScore(points) {
+            gameConfig.score += points;
+            if (gameConfig.score % 100 === 0 && gameConfig.weaponLevel < gameConfig.maxWeaponLevel) {
+                gameConfig.weaponLevel++;
+                showMessage('Arma melhorada!');
+                playSound(sounds.weaponUpgrade);
+            }
+            if (gameConfig.score % 500 === 0) {
+                gameConfig.level++;
+                gameConfig.enemySpeed += 0.5;
+                gameConfig.enemySpawnRate = Math.max(500, gameConfig.enemySpawnRate - 200);
+                clearInterval(enemySpawnerId);
+                startEnemySpawner();
+                showMessage(`Nível ${gameConfig.level} alcançado!`);
+                playSound(sounds.levelUp);
+                saveGame();
+            }
+            updateHudText();
+        }
+
+        function gameOver() {
+            gameConfig.isGameRunning = false;
+            clearInterval(enemySpawnerId);
+            playSound(sounds.warning);
+            showMessage('Game Over! Pontuação salva.');
+            saveGame();
+            setTimeout(() => {
+                mainMenu.style.display = '';
+                checkSavedGame();
+            }, 2000);
+        }
+
+        // ---------- HUD de desempenho ----------
+        function updatePerformance(deltaTime) {
+            const perf = gameConfig.performance;
+            perf.lastFrameTimes.push(deltaTime);
+            if (perf.lastFrameTimes.length > perf.frameTimeHistorySize) perf.lastFrameTimes.shift();
+            const avg = perf.lastFrameTimes.reduce((a, b) => a + b, 0) / perf.lastFrameTimes.length;
+            fpsElement.textContent = `FPS: ${avg > 0 ? Math.round(1000 / avg) : 0}`;
+            const acc = perf.shotsFired ? Math.round((perf.shotsHit / perf.shotsFired) * 100) : 0;
+            accuracyElement.textContent = `Precisão: ${acc}%`;
+            responseTimeElement.textContent = `Tempo de Resposta: ${Math.round(lastResponseTime)}ms`;
+            const slots = document.querySelectorAll('#weapon-indicator .weapon-slot');
+            slots.forEach((slot, i) => { slot.style.opacity = i === currentWeaponIndex ? '1' : '0.5'; });
+            const ready = Math.min(1, (performance.now() - lastShotTime) / gameConfig.weapons[currentWeaponIndex].cooldown);
+            const fill = slots[currentWeaponIndex] && slots[currentWeaponIndex].querySelector('.weapon-ammo-fill');
+            if (fill) fill.style.width = `${Math.round(ready * 100)}%`;
+        }
+
+        // ---------- Loop principal ----------
+        function gameLoop(timestamp) {
+            const deltaTime = Math.min(100, timestamp - lastTime);
+            lastTime = timestamp;
+            if (!gameConfig.isGameRunning) return;
+            drawBackground();
+            updateArm(deltaTime);
+            updateTargeting();
+            if (keyMap.shoot) shootProjectile(timestamp);
+            updateProjectiles(deltaTime);
+            updateEnemies(deltaTime);
+            updateParticles(deltaTime);
+            checkCollisions();
+            updatePerformance(deltaTime);
+            gameLoopId = requestAnimationFrame(gameLoop);
+        }
+
+        // ---------- Inicialização ----------
+        window.addEventListener('load', () => {
+            loadSettings();
+            checkSavedGame();
+            mainMenu.style.display = 'none';
+            newGameBtn.addEventListener('click', () => startGame(null));
+            continueGameBtn.addEventListener('click', () => startGame(Storage.load(SAVE_KEY)));
+            deleteSaveBtn.addEventListener('click', () => { Storage.remove(SAVE_KEY); checkSavedGame(); });
+            settingsBtn.addEventListener('click', () => { mainMenu.style.display = 'none'; settingsMenu.style.display = ''; });
+            settingsBackBtn.addEventListener('click', () => { applySettings(); settingsMenu.style.display = 'none'; mainMenu.style.display = ''; });
+            [aimAssistLevelSelect, graphicsQualitySelect, soundVolumeInput].forEach(el => el.addEventListener('change', applySettings));
+            resizeCanvas();
+            let progress = 0;
+            const loading = setInterval(() => {
+                progress += 5;
+                progressBar.style.width = `${progress}%`;
+                if (progress >= 100) {
+                    clearInterval(loading);
+                    loadingScreen.style.display = 'none';
+                    mainMenu.style.display = '';
+                }
+            }, 100);
+        });
+    </script>
+</body>
+</html>

@@ -9,20 +9,12 @@ const vm = require('node:vm');
 const root = path.join(__dirname, '..');
 const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');
 
-// Arquivos truncados no commit original (código perdido). Ver docs/auditoria.
-const TRUNCADOS_JS = [
-  'game_menu.js',
-  'improved_targeting_system.js',
-  'improved_targeting_system_part2.js',
-  'optimized_game_launcher.js',
-  'space_arm_movement_enhanced.js',
-  'space_combat_enhanced.js',
-];
-const PAGINAS_QUEBRADAS = ['optimized_game.html', 'space_arm_3d.html', 'space_combat_enhanced.html'];
+// Os 6 JS e as 3 páginas antes truncados foram reconstruídos em 2026-11-22
+// (ver docs/auditoria/AUDITORIA-2026-11-22.md). Todos devem compilar.
 
 const jsFiles = fs.readdirSync(root).filter((f) => f.endsWith('.js'));
 const htmlFiles = fs.readdirSync(root).filter((f) => f.endsWith('.html'));
-const paginasJogaveis = htmlFiles.filter((f) => !PAGINAS_QUEBRADAS.includes(f));
+const paginasJogaveis = htmlFiles;
 
 const compila = (codigo) => {
   try {
@@ -40,12 +32,8 @@ const scriptsDaPagina = (html) => ({
   fechamentos: (html.match(/<\/script>/g) || []).length,
 });
 
-for (const f of jsFiles.filter((f) => !TRUNCADOS_JS.includes(f))) {
+for (const f of jsFiles) {
   test(`sintaxe válida: ${f}`, () => assert.ok(compila(read(f))));
-}
-
-for (const f of TRUNCADOS_JS) {
-  test(`continua truncado (remover da lista quando restaurado): ${f}`, () => assert.ok(!compila(read(f))));
 }
 
 for (const f of paginasJogaveis) {
@@ -56,7 +44,6 @@ for (const f of paginasJogaveis) {
     assert.strictEqual(s.aberturas, s.fechamentos, 'todas as tags <script> fechadas');
     for (const src of s.externos) {
       assert.ok(fs.existsSync(path.join(root, src)), `script ${src} existe`);
-      assert.ok(!TRUNCADOS_JS.includes(src), `script ${src} não está truncado`);
       assert.ok(compila(read(src)), `script ${src} compila`);
     }
     s.inline.forEach((code, i) => assert.ok(compila(code), `script inline #${i} compila`));
