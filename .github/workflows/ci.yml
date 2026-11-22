@@ -17,8 +17,14 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
-      # Sem dependências e sem etapa de build: o jogo roda direto no navegador.
+          cache: npm
+      # Sem etapa de build: o jogo roda direto no navegador.
+      - run: npm ci
       - run: npm test
+      # Chrome headless (google-chrome já vem instalado no ubuntu-latest)
+      - run: npm run test:browser
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.12'
